@@ -1,0 +1,8 @@
+ChatRoom/images/
+ChatRoom/**/*.png
+**/*.png
+**/Library/
+**/Temp/
+**/Obj/
+**/Logs/
+**/UserSettings/
