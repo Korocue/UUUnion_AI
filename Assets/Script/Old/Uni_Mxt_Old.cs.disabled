@@ -1,0 +1,3572 @@
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Transactions;
+using TMPro;
+using static EasyMath;
+
+#if UNITY_EDITOR
+using UnityEditor;      // AnimationUtility用
+using UnityEditor.Experimental.GraphView;
+#endif
+
+using UnityEngine;
+using UnityEngine.Analytics;
+using UnityEngine.UI;
+using System.Text;
+using System.Data.Common;   // Text用
+using Random = UnityEngine.Random;
+
+// ミクスチャ
+// ミクスチャへの刺激を「ミックス」と呼ぶ
+// ミクスチャの内部状態に関するクラス
+
+public partial class Uni_Mxt : MonoBehaviour {
+    public string TestString;
+
+    public UUUMaster uuu;
+    //public Union Union;
+    public Union un;
+    public MxtUI ui; 
+    public Mxt_gauge Gauge;
+
+    DTimeChecker DTimeChecker;          // クラス毎にdTimeを取得すること
+    public float dTime;                 // Time.deltaTimeの代替
+    public bool Updated;            // 一度でも更新した？（他クラスのアップデート用）
+
+    // スコア
+    public double Score;                // こみあげ率を元にしたスコア値
+
+    // がまん値
+    public double Gaman;                // ミックス値、色づき値など
+    public double Gaman_p;              // 純粋ながまん値（バイアスを取り除いた値）
+    public double Gaman_Limit;          // 限界値（初期値100）
+    public double Gaman_Limit_p;        // 純粋ながまん限界値（バイアスを乗り除いた値）
+
+    // それぞれにふっくら値を加算する前の値
+    public double GamanRaw;
+    public double GamanRaw_p;
+    public double GamanRaw_Limit;
+    public double GamanRaw_Limit_p;
+
+    // それぞれにふっくら値を加算した値
+    public double GamanFkr; 
+    public double GamanFkr_p;
+    public double GamanFkr_Limit;
+    public double GamanFkr_Limit_p;
+
+    // インスピ値
+    public double Insp;                 // インスピレーションポイント（初期では100でミクスチャが完成）
+    public double InspRaw;              // 生のインスピ（ふっくら値を加算する前の値）
+    public double InspFkr;              // インスピふっくら値（ふっくら値を加算した後の値）
+    public double Insp2;                // インスピステージ2値（はぁはぁ） - 圧縮により10倍圧縮された値
+                                        // インスピ値のうち、どこまでがステージ2まで圧縮されているかを示す値
+    public double Insp3;                // インスピステージ3値（うんうん / しろっぷ）
+                                        // インスピ2値のうち、どこまでがステージ3まで圧縮されているかを示す値
+                                        // public double Insp_Loss;          // インスピ減衰率（メソッド化により廃止）
+    public double InspMinus;            // マイナスインスピ値（高品質なバクハツで得られる値）
+    public string mInspMinus;           // マイナスインスピ値の吸収モード（"minus", "absorb"）
+    public double Insp_Limit;           // インスピレーション限界値（基本的にミクスチャが完成）
+    public double Insp_Limit_Base;      // インスピレーション限界基準値（がまんしなくてもこの値までは溜められる）
+    public double Insp_Limit_Base2;     // たまらん補正を受ける前のインスピ限界値
+    public double Insp_Ratio;
+    public double Insp_Over;
+    public double Insp1;            // インスピ1値（はぁはぁ）
+    // public double Insp2;            // インスピ2値（うんうん / しろっぷ）
+    // public double Insp3;            // インスピ3値（くっくっ）
+    public double dUpInsp;          // 上昇中インスピ（ポップ生産用）
+    public double dUpInspPop;       // 上昇中インスピ（テキストポップ生産用）
+    public double StatKeepInsp;     // インスピレーション維持指数（どれだけ高いインスピレーションを維持したか）
+
+    public double Bear;                 // 生産量（Productに置き換わるかも）
+    public double Bear_Warning;         // 警告表示による生産
+
+    // フレーバー値
+    public double Fl_Mix;           // ミックスによって色気づきが増加する
+    public double Fl_Mix_Irk;       // ミックスフレーバー値のうち、色気づき値に割り当てられている値
+    public double Fl_Mix_Irk_Insp;  // 仮・インスピで補正された値
+    public double Fl_Mix_Max;       // ミックスフレーバー最大値(ミクスチャ強度×100 / 初期は100)
+
+    // ふっくら値
+    public bool fFkr;               // ふっくら値使用フラグ（未使用の場合False）
+    public bool isFkr;              // 値はふっくらを適用した後の値？（Insp = InspFkr？）
+    public double Fkr;              // （フレーバーやたまらん値などから）インスピとガマンを同時に底上げされる値
+    public double PreFkr;           // 直前のふっくら値
+    public double FkrTmrn;          // たまらん由来のふっくら値
+    public double FkrFl;            // フレーバー由来のふっくら値
+
+    //public class Flavor_List
+    //{
+    //     public List<Flavor> Fl_List;
+    //}
+    //public Fl_List Fl;              // フレーバー１（ここにフレーバーをセットする）
+    //public Flavor Fl_Kuripon;       // フレーバーくりぽん
+
+    // がまん値（b50で仕様変更により削除）
+    // public double Gaman;            // がまん値（インスピレーションポイントに先立って溜まる値）
+    // public double Gaman_Exp;        // がまん経験値
+    // public double Gaman_Level;      // がまんレベル（ガマン強さ）
+    // public double dGaman;           // デルタがまん値（この値を少しずつ処理して減らしていく）
+    // public double Gaman_Limit;
+
+    // ミックス値(b49以降)
+    public double Mix;              // ミックスポイント
+    public double Pre_Mix;          // プリミックス値（ミックスのために装填される値 / 0-1）
+
+    // ミックス値
+    // public double Mix;              // ミックスポイント
+    // public double Pre_Mix;      // プリミックス値（ミックスのために装填される値）
+    public bool Mix_State;          // ミックス状態（インスピ上昇ポップ表示用）
+    public double Pre_Mix_Max;  　　// ポップ計算用プリミックス最大値
+    public double Pre_BMix_Max; 　　// ポップ計算用プリミックス最大値（ボーナス加算）
+    public double Pre_Mix_Bonus;    // ボーナス値（ミックスのこすり上げ用）
+    public double dPre_Mix_Bonus;   // ボーナス値（ミックスのこすり上げ用）
+    // public double mps_a;            // ポップ計算用補正値A（ミックス平均値）
+    // public double mps_b;            // ポップ計算用補正値B
+    public double MixStrength;  // ミックスの強さ（１回辺りにインスピが上げられる量）
+    public double StatMix;      // 総ミックス数
+    public double dMix;         // デルタミックス（適用前ポイント）
+    public double dMix_Min;     // ポップ計算用デルタミックス最低値（慣れてしまってこれ以下のミックスを感じない）
+    public double ddMix;        // デルタデルタミックス
+    public double ddMixSukkiri;      // すっきり適用後のデルタミックス値
+    public double Mix_a;            // ミックスa値（ライチ収束適用前の素の値）
+    public double Mix_b;            // ミックスb値（ライチ収束適用後、すっきり適用前値）
+
+    // どきどき値
+    public double Dokidoki;                   // どきどき値
+    public double Dokidoki_Cap;           // どきどき許容値（インスピがこの許容値を超えるとドキドキする）
+
+    // 色気づき値
+    // 最終的に色づき値は廃止予定
+    public double Irk;                    // 色気づきポイント
+    public double dIrk;                   // デルタ色気づき 
+    public double Irk_Insp;               // 仮・インスピで補正された値
+
+    // 色づき値
+    public double Iroduki;                // 色づきポイント
+    public double Iroduki_Loss;           // 色づき減衰
+    public double Iroduki_Limit;          // 色づき限界値
+    public double Iroduki_Limit_Base;     // 色づき限界値基準値
+    public double Iroduki_Increase;       // フレーバーによる色づき上昇
+    public double Iroduki_IncreaseLimit;  // フレーバーによる色づき上昇限界
+    public double Iroduki_Absorbing;      // 吸収中エネルギー（ポップ生成用）
+
+    public int Iroduki_nChildPop;         // 色づき子ポップの数
+    public class _Iroduki_ChildPop
+    {
+        public GameObject obj;
+        public double time;                         // 残り時間
+        public double posgx;
+        public double posgy;                        // 目標位置（ランダムで決める）
+        public double posx;
+        public double posy;
+    }
+
+    public List<_Iroduki_ChildPop> Iroduki_ChildPop;
+    // 色づき子ポップ
+    public GameObject ICPop_0_1;          // 0.1子ポップ
+
+    public double StatIrodukiAbsorbInsp;  // 色づきがインスピを吸収した総量
+                                          //public double StatGaman;            // がまん指数（色づき状態でどれだけがまんしたか）
+    public double Iroduki_Capacity;       // 色づきがインスピ限界値の何倍を吸収できるか（初期は100倍の設定だった）
+    public double Iroduki_PopScale;       // 色づきポップの大きさ
+
+    // ためこみ値
+    public double Tamekomi;
+    public double Tamekomi_Limit;         // ためこみ限界値
+    public double Tamekomi_Limit_Base;    // ためこみ限界基準値
+
+    // ■バクハツ関連
+    Bakuhatu bkht;                      // バクハツ用内部クラスのインスタンス
+
+    // こみあげ値
+    public double Komiage;              // こみあげポイント（ふんばり状態の時の生産量を決める値）
+    public double Komiage_Rate;         // こみあげ率（インスピ超過に応じてこみあげる割合）
+    public double Komiage_b;            // こみあげ値が一度上がったら、下がらないように固定する値
+    public double MaxKomiageRate;       // 最大こみあげ率（しっかり吐き出すために）
+    public double MaxKomiage;           // 「適正なすっきり値を求めるため」のこみあげ最大値
+    public double Haki_Komi_b;            // こみあげ値を参考にゆっくり変化するb値（熱しにくく冷めにくい）
+    public double Komiage_Limit;        // こみあげ限界値（≒生産量の上限）
+    public double Komiage_Power;        // インスピ限界を超えた場合のこみあげ量を決める係数 (0.005f)
+
+    // ふんばり値
+    public double Funbari;              // ふんばりポイント（色づき値を使って生産するためのポイント）
+    public double Funbari_Rate;         // ふんばり率（こみあげ値に対してふんばる割合）
+    public double Funbari_Limit;        // ふんばり限界値（これが限界になるとこみあげてバクハツする）
+    public float Funbari_Power;         // こみあげた場合のふんばり量が増加する係数 (0.015f)
+    public float Funbari_InspBonus;     // こみあげた場合、インスピ量によるふんばり増加ボーナス（0.000f）
+    public float FunbarisugiPenaltyPow; // ふんばりが高すぎてこみあげが枯渇してしまうのを防ぐ係数
+                                        // こみあげに対するふんばり量を出来るだけ 1.0 から遠さげる乗数 (3.0f)
+                                        // こみあげ限界値ボーナス
+    public float Funbari_KomiageBonusPow;       // こみあげがどれだけインスピ限界値に近づく必要があるかを決める乗数 (5.0f)
+    public float Funbari_KomiageBonusInspBonus; // このボーナスのインスピ量による増加ボーナス (0.02f)
+
+    // うまれる値
+    public double Umareru;              // ふんばりがこみ上げに伝わり「うまれる」
+    // public double PreUmareru;           // 直前のうまれる値（InspPop用）
+    // public double Dokkun;               // どっくん値（旧うまれる値）
+    public float Dokkun_Power;          // ふんばった場合の脈動が速くなる係数 (0.075f)
+    public double Umareta;              // 産まれた値（完成時のうまれる値）
+
+    // こみあげがインスピ限界値に近づくと、脈動に大きな溜めが入る
+    public float Dokkun_KomiageInspOverBonus;       // ふんばり中の、インスピ値超過量によるどっくん値抑制ボーナス（溜まりやすくなる）（0.000f）
+    public float Dokkun_KomiageBonusPow;            // どれだけインスピ限界値に近づく必要があるかを決める乗数 (5.0f)
+
+    // ふんばりがインスピ限界値に近づくと、脈動に大きな溜めが入る
+    public float Dokkun_FunbariInspOverBonus;       // ふんばり中の、インスピ値超過量によるどっくん値抑制ボーナス（溜まりやすくなる）（0.000f）
+    public float Dokkun_FunbariBonusPow;            // どれだけインスピ限界値に近づく必要があるかを決める乗数 (5.0f)
+
+    // はきだし値
+    public bool fHaki;                 // はきだし値によってこみあげ値に補正をかける？
+    public double Haki;                 // こみあげ値のうちすでに生産済みの値
+    public double Haki_Rate;            // はきだし率
+    public double Haki_Komi;            // はきだし値を引いたこみあげ値
+
+    // 生産量
+    public double Product;              // 出来上がった生産物の量（仮）
+    public double dProduct;             // 生産量デルタ（産まれそうなもの）
+    public double ddProduct;            // 生産量デルタデルタ（産んでる途中）
+    public double dddProduct;           // 生産量デルタデルタデルタ（産んでる加速度）
+
+    /*
+    public int[] ProductItems;          // 生産アイテム（ホイップ、モチなど） 
+    public double ProductHeart;         // 非アイテム生産量（ハートと定義）
+    public GameObject Prod_ElmK_Org;
+    public GameObject Prod_Moti_Org;
+    public GameObject Prod_Whip_Org;
+    public GameObject Prod_Syrup_Org;
+    public int ProductFlavor_Num;       // 生産物フレーバー数
+                                        //public GameObject[] ProductFlavors; // 産みたての生産物はフレーバーになる
+    List<GameObject> ProductFlavors;    // 産みたての生産物はフレーバーになる*/
+
+    public int Producing;              // 産み方テスト（今産んでいる生産物）
+    public double Produced;            // すでに産まれた生産物総量
+
+    public double Sukkiri;                  // すっきり値
+    public double dSukkiri;             // すっきり値デルタ（dProductに計算される予約値）
+    public double StatSukkiri;          // 総すっきり量
+
+    public double Tamaran;                 // たまらん値（インスピ量超過によって爆発の引き金になる値
+    public double Tamaran_Insp;            // たまらん計算用インスピ補正値
+    public double TamaranMix;              // たまらんミクスチャ（インスピ限界に近づきミクスチャがたまらない）
+    public double Tamaran_A;           　　// たまらんＡ値（こみあげや掃き出しなどから影響される補正値）
+    public double Tamaran_Ratio;
+    public double Tamaran_Over;
+
+    public double OldGaman;                // がまん値（仮）
+    public double dOldGaman;               // デルタがまん値（差分値／これから処理される数値）
+
+    public double dbgflIncProd;
+    public double dbgflLimProd;
+
+    // Use this for initialization
+    void Start() {
+        DTimeChecker = new();
+        Updated = false;
+
+        Mix_State = false;
+
+        Insp = Insp2 = Insp3
+        = Dokidoki = Dokidoki_Cap = Funbari = Umareru = Komiage = Komiage_b = MaxKomiage = 0;
+        if (uuu.TestCode == "Manjutane") Insp = 1.90;       // 初期に「考える」を起こすための初期値
+
+        mInspMinus = "absorb";                                // マイナスインスピ吸収モード「すこしずつ吸収」
+        //mInspMinus = "minus";                               // マイナスインスピ吸収モード「ただのマイナス」
+
+        InspRaw = InspFkr = 0;
+
+        Product = dProduct = ddProduct = dddProduct = Sukkiri = dSukkiri = 0;
+        StatMix = Mix = Mix_a = Mix_b = 0;
+
+        fFkr = true;
+        isFkr = true;
+        Fkr = PreFkr = FkrTmrn = FkrFl = 0;                      // ふくらみ値
+        Irk = 0;                                                 // 色気付き値 
+
+        if (uuu.TestCode == "Kurimanju") Iroduki = 16;
+        if (uuu.TestCode == "Manjutane") Iroduki = 0;
+        Iroduki_Increase = 0.01;        // フレーバーによる色づき上昇
+        Iroduki_IncreaseLimit = 0;      // フレーバーによる色づき上昇限界（現在用途不明）
+        StatIrodukiAbsorbInsp = 0;
+        Tamaran = 0;
+
+        // ためこみ限界値の初期上限
+        // 初期はこのレベルまでの生産が可能
+        Gaman = 0.1f;                                           // 初期は10%（1%のミックス10回分）
+        Gaman_Limit = 1;                                        // がまん値の上限（1%のミックスを100回分）
+        Gaman_p = 0;                                            // がまん値は0除算を防ぐために0.1の下駄を履いている
+        Gaman_Limit_p = 0;                                      // _p値はその下駄を取り除いたもの
+
+        // Raw値、Fkr値もそれぞれリセット
+        GamanRaw = GamanFkr = GamanRaw_p = GamanFkr_p
+        = GamanRaw_Limit = GamanFkr_Limit = GamanRaw_Limit_p = GamanFkr_Limit_p = 0;
+
+        Tamekomi_Limit_Base = Tamekomi_Limit = 1;
+        Iroduki_Limit_Base = Iroduki_Limit = Tamekomi_Limit;
+        //Iroduki_Limit_Base = Iroduki_Limit = 20;
+        //Insp_Limit_Base = Iroduki_Limit * 0.1;  // 竿より玉にいっぱい貯められる
+        //Gaman_Limit = Iroduki_Limit;
+        Insp_Limit_Base = Iroduki_Limit;
+        Insp_Limit = Insp_Limit_Base2 = Insp_Limit_Base;
+        Iroduki_Capacity = 100;                         // 色づきがインスピの何倍を吸収できるか（初期は100倍の設定だった）
+        Iroduki_ChildPop = new List<_Iroduki_ChildPop>();
+
+        MixStrength = 1;                                // ミクスチャの強さ
+        Pre_Mix = MixStrength;
+        Pre_Mix_Bonus = 0;
+        Fl_Mix = Fl_Mix_Max = MixStrength * 100;        // ミクスチャフレーバー値
+
+        bkht = new(un);
+
+        fHaki = true;
+        if (mInspMinus == "absorb") fHaki = false;
+        Funbari_Limit = 100;                                // 仮
+        Komiage_Limit = 100;
+        // ProductItems = new int[50];                         // シロップ９種、ホイップ９種、モチ９種、その他予備
+        // for (int i = 0; i < 50; i++) Union.ProductItems[i] = 0;
+        un.ProductFlavor_Num = 0;                              // 生産物フレーバー
+        un.ProductFlavors = new List<GameObject>();            // 生産物フレーバー配列初期化
+        //ProductFlavors = new GameObject[0];               // 空の配列
+        Producing = 0;
+        Produced = 0;
+    }
+
+    //***********************************************************************
+    //***********************************************************************
+    //***********************************************************************
+    //***********************************************************************
+    //***********************************************************************
+    //***********************************************************************
+    // Update is called once per frame
+    void Update() {
+
+        UpdateInit();
+
+        Sukkiri = 0;                    // 現在すっきり無効化中
+
+        UpdateInsp();                   // インスピ処理
+        UpdateInspLimit();              // インスピ上限値更新
+        UpdateFlavor();                 // フレーバー処理
+        UpdateMix();                    // ミックス処理
+        UpdateMixStrength();            // ミクスチャの強さ更新
+        UpdateDokidoki();               // どきどき値
+        UpdateIrk();                    // 色気づき
+        UpdateGaman();                  // がまん値
+        UpdateGamanLimit();             // がまん限界
+        
+        UpdateIrodukiLimit_Kurimanju(); // 旧色づき更新（廃止予定？）
+        UpdateIroduki();                // 色づき更新（廃止予定？）
+        UpdateTamekomi();               // ためこみ値（未使用？）
+        UpdateTamekomiLimit();          // ためこみ限界（未使用？）
+
+        UpdateFkr();                    // ふくらみ値
+        UpdateBakuhatuParam();          // バクハツ系パラメータ更新
+        Production();
+
+        // UIにインスピレーションの数値を反映する
+        // UI.Insp = Insp;
+        Mix_a *= 0.99;
+
+        // ここでDebugInfoのテキストを更新
+        UpdateDebugText();
+        Updated = true;
+    }
+
+    // Update用前処理
+    // dTimeやトレースモードなどの処理
+    void UpdateInit()
+    {
+        // アプデ毎に1回読まないと大変なことになる
+        if (DTimeChecker == null) DTimeChecker = new();
+        dTime = DTimeChecker.GetDeltaTime();
+
+        // トレースモードの場合
+        // UnionのdTimeは0になったり1フレームになったりする
+        // Union.cs内でフレーム送りの処理があり
+        // そこで逐次dTimeに進める時間を設定してコマ送りをする
+        if (!uuu.ModeTrace)
+        {
+            //dTime = Time.deltaTime;
+        }
+        else
+        {
+            dTime = uuu.dTime;
+        }
+
+        // カクツキが発生した場合にブレークポイントを設定する
+        if (dTime > 1.0f / 15)
+        {
+            dTime = 1.0f / 15;
+            // 15fps以上で極端な数字は丸める
+        }
+
+        // デバッグ文字列配列の再生成
+        uuu.CheckDebugArray();
+    }
+
+    // ミックスする
+    // b59現在何もしない
+    public void DoMix()
+    {
+        // Mix_a += Mix;
+
+        //this.Mix += MixStrength / 2;
+        // こすり上げとこすり上げのセットでMixStrengthと等価に
+
+
+        // プリミクスチャ値を消費してミックスを行う
+        // こすり下げとこすり上げのセットでMixStrengthと等価に
+        // Mix += (Pre_Mix - Mix) / 2;
+
+        // UpdateMix()に対して
+        // こちらはこすり下げとこすり上げ時の命令を処理する
+
+        //if (Union.mix_state == 1) Mix = Pre_Mix;
+
+        if (un.mix_state == 1)
+        {
+            // ミクスチャだけで無条件にミクスチャ値増加
+            //Mix += MixStrength;
+        }
+
+        // こすり上げ時に50%程度のボーナスが入る
+        // プリミクスチャの不足分だけ、つまり十分こすり下げがされてる状態でボーナスが入る
+        // UpdateMixで行うべき処理をここで行ってしまっているので
+        // そのうちまとめる予定
+        // Pre_Mix_Bonusはミクスチャ強度を適用しない0-1の値
+
+        if (false)
+        //if (Union.mix_state == 0)
+        {
+            dIrk += (1 - Pre_Mix) * 0.5 * Fl_Mix
+                * 0.01f;
+
+            Fl_Mix -= (1 - Pre_Mix) * 0.5 * Fl_Mix
+                * 0.01f;
+
+            Mix += MixStrength * 0.5 * (1 - Pre_Mix);
+            dIrk -= MixStrength * 0.5 * (1 - Pre_Mix); // 色気づき消費
+            dPre_Mix_Bonus += (1 - Pre_Mix) * 0.5;
+            //Mix += (MixStrength - Pre_Mix) * 0.5;
+            //dPre_Mix_Bonus += (MixStrength - Pre_Mix) * 0.5;
+        }
+    }
+
+    public double GetMix()
+    {
+        // インスピレーション蓄積量は決して1を越えない
+        // this.Mix_b = EasyMath.ConvTo(this.Mix_a, 1.0f, 1.0f);
+
+        this.Mix_b = Mix_a;
+        return Mix = Mix_b * (Sukkiri_Invalid_Rate_B(1, 1));
+    }
+
+    // 子ポップ処理・廃棄
+    float UpdateIrodukiChildPop()
+    {
+        // 小ポップの合算を渡し、後に全体のポップの大きさにさらに合算する
+        float t_val = 0;
+
+        int n = Iroduki_nChildPop;
+        while (n-- > 0)
+        {
+            //using (FileStream fs = new FileStream("hoge.txt", FileMode.Open, FileAccess.Read, FileShare.None))
+
+            // using st = Iroduki_ChildPop[n];
+            //_Iroduki_ChildPop st = Iroduki_ChildPop[n];
+            Iroduki_ChildPop[n].posx += (Iroduki_ChildPop[n].posgx - Iroduki_ChildPop[n].posx) * 2 * dTime;
+            Iroduki_ChildPop[n].posy += (Iroduki_ChildPop[n].posgy - Iroduki_ChildPop[n].posy) * 2 * dTime;
+            //Iroduki_ChildPop[n].
+            Vector3 pos = Iroduki_ChildPop[n].obj.transform.localPosition;
+            pos.x = ui.ip.ConvertScale(Iroduki_ChildPop[n].posx);
+            pos.y = ui.ip.ConvertScale(Iroduki_ChildPop[n].posy);
+            Iroduki_ChildPop[n].obj.transform.localPosition = pos;
+            double time = Iroduki_ChildPop[n].time;
+            float val = 0.1f * ((float)time / 5.0f);
+            if (time > 4.9f)
+            {
+                val *= (float)(5.0f - time) * 10.0f;
+            }
+
+            t_val += val;
+            float ps = ui.ip.ConvertScale(val);
+            // Vector3 scale = new();
+            //scale.x = 1.0f * ((float)time / 5.0f);
+            //scale.y = 1.0f * ((float)time / 5.0f);
+            Iroduki_ChildPop[n].obj.transform.localScale = new Vector3(ps, ps, ps);
+            Iroduki_ChildPop[n].time -= dTime;
+            if (Iroduki_ChildPop[n].time < 0)
+            {
+                Destroy(Iroduki_ChildPop[n].obj);
+                Iroduki_ChildPop.Remove(Iroduki_ChildPop[n]);
+                Iroduki_nChildPop--;
+            }
+        }
+        return t_val;
+    }
+
+    // ここでDebugInfoのテキストを更新
+    public void UpdateDebugText()
+    {
+        // 対象うにおんのみデバッグ情報を表示
+        if (uuu.tu != this.un)
+        {
+            return;
+        }
+
+        uuu.DebugText.text = "\n\n\n\n== Debug Informations (0/100) ==" + "\n"
+            /*"減退率 = " + (1 - Mathf.Pow((float)((Insp > Insp_Limit ? Insp_Limit : Insp) / Insp_Limit), 1.5f)
+                        * (1.0f - EasyMath.ConvTo(Mix, 1.0f, 0.005) + 0.001)).ToString("F3") + "\n" +
+            "減退率a = " + (1 - Mathf.Pow((float)((Insp > Insp_Limit ? Insp_Limit : Insp) / Insp_Limit), 1.5f)).ToString("F3") + "\n" +
+            "減退率b = " + (Mathf.Pow((float)((Insp > Insp_Limit ? Insp_Limit : Insp) / Insp_Limit), 1.5f)).ToString("F3") + "\n" +
+            "減退率c = " + (1.0f - EasyMath.ConvTo(Mix, 1.0f, 0.005) + 0.001).ToString("F3") + "\n" +
+            "減退率d = " + (1 - (1 - (Mathf.Pow((float)((Insp > Insp_Limit ? Insp_Limit : Insp) / Insp_Limit), 1.5f)))
+                        * (1.0f - EasyMath.ConvTo(Mix, 1.0f, 0.005) + 0.001)).ToString("F3") + "\n" +*/
+            //"減退率e = " + (1 - (1 - Gensui_a) * (1 - Gensui_b)).ToString("F3") + "\n" +
+            //"減退率ea = " + Gensui_a.ToString("F3") + "\n" +
+            //"減退率eb = " + Gensui_b.ToString("F3") + "\n" +
+            //"減退率ec = " + Gensui_c.ToString("F3") + "\n" +
+            //"位置yカーブ = " + (curvePosy.Evaluate(Time.time) * 100000).ToString("F8") + "\n" +
+            //"スケールxカーブ = " + curveScalex.Evaluate(Time.time).ToString("F3") + "\n" +
+            //"スケールyカーブ = " + curveScaley.Evaluate(Time.time).ToString("F3") + "\n" +
+            + "マニュアル自動インスピ = " + uuu.manual_automix_time.ToString("F4") + "\n"
+
+            + "\n"
+
+            + "■b53 - ファイル入出力" + "\n"
+            + uuu.FileIOString
+
+            + "\n"
+
+            + "■b56" + "\n"
+            + "ふっくら = " + Fkr.ToString("F4") + "\n"
+            + "がまん値 = " + Gaman.ToString("F4")
+                   + "(" + ((Gaman / Gaman_Limit) * 100).ToString("F2") + "%" + ")"
+                   + " / " + Gaman_Limit.ToString("F4")
+                   + " - Raw : " + GamanRaw_Limit.ToString("F4") + "\n"
+            + "インスピ = " + Insp.ToString("F4") + " / " + Insp_Limit.ToString("F4") + "\n"
+            + "インスピ- = " + InspMinus.ToString("F4") + "\n"
+            + "インスピ1 = " + Insp1p().ToString("F4") + " / " + Insp.ToString("F4") + "\n"
+            + "インスピ2 = " + Insp2p().ToString("F4") + " / " + Insp2.ToString("F4") + "\n"
+            + "インスピ3 = " + Insp3p().ToString("F4") + " / " + Insp3.ToString("F4") + "\n"
+            + "インスピ質量 = " + InspVolume().ToString("F4") + " / " + Gaman.ToString("F4") + "\n"
+            + "色づき（がまん） = " + Iroduki.ToString("F4") + " / " + Iroduki_Limit.ToString("F4") + "\n"
+
+            + "\n"
+
+            + "■b50（がまん関連）" + "\n"
+            + "残りがまん値（インスピ2） = " + (Gaman_Limit - Insp2).ToString("F4") + " / " + Gaman_Limit.ToString("F4") + "\n"
+
+            + "\n"
+
+            + "■b49" + "\n"
+            + "ミックスフレーバー値 = " + Fl_Mix.ToString("F2") + "\n"
+            //+ "フレーバー値(0) = " + un.flavor0.ToString("F2") + "\n"
+            + "色気づき = " + Irk.ToString("F4") + "\n"
+            + "　インスピ補正後 = " + Irk_Insp.ToString("F2") + "\n"
+            + "色気づき自動インスピ = " + un.irk_automix_time.ToString("F4") + "\n"
+            + "デルタ色気づき = " + dIrk.ToString("F4") + "\n"
+            + "Pre_Mix = " + Pre_Mix.ToString("F2") + "\n"
+
+            + "\n"
+
+            + "■たまらん関連" + "\n"
+            + "たまらん(iv値) = " + Tamaran.ToString("F2") + "(" + InspVolume().ToString("F2") + ")" + "\n"
+            + "たまらんインスピ = " + Tamaran_Insp.ToString("F2") + "\n"
+            + "たまらんミクスチャ = " + TamaranMix.ToString("F2") + "\n"
+            + "たまらんA = " + Tamaran_A.ToString("F2") + "\n"
+
+            + "\n"
+
+            + "■バクハツ関連" + "\n"
+            + "スコア = " + ((int)Score).ToString("F0") + "\n"
+            + "こみあげ = " + Komiage.ToString("F4") + "\n"
+            + "こみあげ率 = " + (Komiage_Rate * 100).ToString("F2") + "%" + " / " + (MaxKomiageRate * 100).ToString("F2") + "%" + "\n"
+            + "はきだし率 = " + (Haki_Rate * 100).ToString("F2") + "% (" + Haki.ToString("F4") + ")" + "\n"
+            + "はきこみ = " + Haki_Komi.ToString("F4") + "\n"
+            + "はきこみb = " + Haki_Komi_b.ToString("F4") + "\n"
+            + "ふんばり率 = " + (Funbari_Rate * 100).ToString("F4") + "%" + "\n"
+            + "ふんばり = " + Funbari.ToString("F4") + "\n"
+            + "どっくん = " + Umareru.ToString("F4") + "\n"
+            + "こみあげ限界 = " + Komiage_Limit.ToString("F2") + "\n"
+
+            + "\n"
+
+            /*
+            + "Insp = " + Insp.ToString("F2") + "\n"
+            + "Insp1 = " + Insp1.ToString("F2") + "\n"
+            + "Insp2 = " + Insp2.ToString("F2") + "\n"
+            + "Insp2 = " + Insp3.ToString("F2") + "\n"
+            */
+
+            + "ハート生産量 = " + un.ProductHeart.ToString("F4") + "\n"
+            + "ミクスチャ = " + Mix.ToString("F2") + "\n"
+            + "dミクスチャ = " + dMix.ToString("F2") + "\n"
+            + "ddミクスチャ = " + ddMix.ToString("F2") + "\n"
+            + "ddすっきりミクスチャ = " + ddMixSukkiri.ToString("F2") + "\n"
+            + "すっきり値 = " + Sukkiri_Rate().ToString("F2") + "\n"
+            + "すっきり値a = " + dSukkiri.ToString("F2") + "\n"
+            + "すっきり値b = " + Sukkiri.ToString("F2") + "\n"
+            + "すっきり無効化率 = " + Sukkiri_Invalid_Rate(5).ToString("F2") + "\n"
+            + "すっきり無効化率b = " + Sukkiri_Invalid_Rate_B(5, 5).ToString("F2") + "\n"
+            + "Tamaran = " + Tamaran.ToString("F2") + "\n\n"
+
+            + "ゲーム内時間 = " + uuu.IngameTime.ToString("F3") + "\n"
+            + "どきどき値 = " + Dokidoki.ToString("F3") + "\n"
+            + "インスピ上限 = " + Insp_Limit.ToString("F2") + "\n"
+            + "インスピ上限補正前 = " + Insp_Limit_Base2.ToString("F2") + "\n"
+            + "色づき上限 = " + Iroduki_Limit.ToString("F2") + "\n"
+            + "ミクスチャの強さ = " + MixStrength.ToString("F4") + "\n"
+            + "　フレーバーによる強化率 = " + (Iroduki_IncreaseLimit / 100).ToString("F4") + "\n"
+            + "dddProduct = " + dddProduct.ToString("F3") + "\n"
+            + "ddProduct = " + ddProduct.ToString("F3") + "\n"
+            + "dProduct = " + dProduct.ToString("F3") + "\n"
+            + "Product = " + Product.ToString("F3") + "\n"
+            + "InspRatio = " + Insp_Ratio.ToString("F3") + "\n"
+            + "InspOver = " + Insp_Over.ToString("F3") + "\n"
+            + "こんぶ = " + (1 - EasyMath.ConvTo(Insp, 1, 0.005)).ToString("F2") + "\n"
+            //"ミクスチャa値 = " + Mix_a.ToString("F2") + "\n"
+            //"ミクスチャb値 = " + Mix_b.ToString("F2") + "\n"
+            + "プリミクスチャ = " + Pre_Mix.ToString("F2") + "\n"
+            + "mps_a = " + ui.mps_a.ToString("F2") + "\n"
+            + "mps_b = " + ui.mps_b.ToString("F2") + "\n\n"
+            ;
+    }
+
+    // デバッグ用文字登録
+    // 指定されたページと列に指定された文字列を登録する
+    void dbg(int page, int i, string str)
+    {
+        uuu.dbg(page, i, str);
+    }
+
+    // がまんする
+    // （インスピ限界値をn%上げる）
+    public void Endure(double OldGaman)
+    {
+        if (uuu.TestCode == "Kurimanju")
+        {
+            // Gaman += OldGaman;
+            // Gaman値の仕様変更により削除
+        }
+
+        if (uuu.TestCode == "Manjutane")
+        {
+            // とりあえず初期秒間生産量の５倍をガマンする
+            // Gaman += 0.05 + Gaman_Level;
+            // Gaman値の仕様変更により削除
+            //Gaman_Exp += 0.05;
+            //Gaman_Level = 0.01 * Mathf.Sqrt((float)(Gaman_Exp / 100.00f));
+            // 最初に0.01上昇するのに
+        }
+
+        //this.OldGaman -= OldGaman;
+
+        //dOldGaman += this.OldGaman / 2;
+        //this.OldGaman /= 2;
+
+        /*double Delta_Insp_Limit;
+        Delta_Insp_Limit = (Insp_Limit_Base * (dOldGaman / 100)) * Insp_Rate();
+        // インスピ限界値の超過分だけ下げる
+        if (Insp_Limit > Insp_Limit_Base)
+        {
+            Delta_Insp_Limit *= Insp_Limit_Base / Insp_Limit;
+        }
+        Insp_Limit += Delta_Insp_Limit;*/
+        //Insp *= 1 + Delta_Insp_Limit / Insp_Limit;
+    }
+
+    // 限界値に対するインスピ率をちょっと加工して返します
+    // 限界値寸前でおよそ２倍になります
+    // （がまん用）
+    public double Mix_Rate()
+    {
+        return 5 * Mathf.Pow((float)(Insp / Insp_Limit), 2);
+    }
+
+    // インスピ値に対するすっきり値の割合を 0 - 1 の範囲で返す
+    public float Sukkiri_Rate()
+    {
+        // すっきり値はb56からマイナスインスピ値に変更
+        if (mInspMinus == "absorb")
+        {
+            // がまん限界の100%でマックスすっきり
+            // float r = (float)(InspMinus / Gaman_Limit_p) * 1.0f;
+            // がまん限界の50%でマックスすっきり
+            float r = (float)(InspMinus / Gaman_Limit_p) * 2.0f;
+            r = Mathf.Clamp(r, 0, 1);
+            return r;
+        }
+        if (mInspMinus == "minus")
+        {
+            if (Sukkiri > Iroduki_Limit) return 1;
+            if (Sukkiri < 0) return 0;
+            return (float)(Sukkiri / Iroduki_Limit);
+        }
+        return 0;
+    }
+
+    // すっきり無効化率
+    // インスピ値に対するすっきり値の割合を利用して
+    // 引数で補正した値を返す
+    // この補正値で少しでもすっきり値があると、0に近い値を返す
+    public float Sukkiri_Invalid_Rate(float f)
+    {
+        if (Iroduki_Limit < 0) return 0;
+        if (Sukkiri > Iroduki_Limit) return 0;
+        if (Sukkiri < 0) return 1;
+
+        float res = Mathf.Pow(1 - (float)(Sukkiri / Iroduki_Limit), f);
+        if (res > 1)
+        {
+            res = 1;
+        }
+        if (res < 0)
+        {
+            res = 0;
+        }
+        return res;
+    }
+
+    // すっきりに無効化された値をさらに
+    // こみあげ値により無効化して1に近い値に戻す
+    public float Sukkiri_Invalid_Rate_B(float f, float f2)
+    {
+        if (Iroduki_Limit < 0) return 1;
+        if (Haki_Komi > Iroduki_Limit) return 1;
+
+        float invrate = Sukkiri_Invalid_Rate(f);                                    // すっきり値により無効化された部分を
+        float invinvrate = Mathf.Pow(1 - (float)(Haki_Komi / Iroduki_Limit), f2);   // こみあげ値によりさらに無効化して1に近づける
+
+        if (Haki_Komi < 0)
+        {
+            invinvrate = 0;
+        }
+
+        float res =
+            1 -
+            (float)(
+                (1 - invrate)   // すっきり値により無効化された部分を
+                * invinvrate    // こみあげ値によりさらに無効化して1に近づける
+            );
+
+        if (res > 1)
+        {
+            res = 1;
+        }
+        if (res < 0)
+        {
+            res = 0;
+        }
+        return res;
+    }
+
+    public float Sukkiri_Invalid_Rate_C(float f, float f2)
+    {
+        if (Iroduki_Limit < 0) return 1;
+        if (Haki_Komi > Iroduki_Limit) return 1;
+
+        float invrate = Sukkiri_Invalid_Rate(f);                                    // すっきり値により無効化された部分を
+        float invinvrate = Mathf.Pow(1 - (float)(Komiage / Iroduki_Limit), f2);   // こみあげ値によりさらに無効化して1に近づける
+
+        if (Haki_Komi < 0)
+        {
+            invinvrate = 0;
+        }
+
+        float res =
+            1 -
+            (float)(
+                (1 - invrate)   // すっきり値により無効化された部分を
+                * invinvrate    // こみあげ値によりさらに無効化して1に近づける
+            );
+
+        if (res > 1)
+        {
+            res = 1;
+        }
+        if (res < 0)
+        {
+            res = 0;
+        }
+        return res;
+    }
+
+    // チャンネル同士で移動する値を返すメソッド
+    public double Absorb(double _inspsrc, double _inspdst, double dstmax, float rate, float dstpow)
+    {
+        // チャンネルに余裕があったら余計に詰め込んでしまう
+        // これは円の面積みたいだよね、半径の2乗
+        // そういうイメージの計算式
+        // 逆も然りかな、多すぎると吐き出したくなる（パターン１）
+        // これは単純にn乗して吐き出す
+        // 吐き出す量をグラフにすると、下に近づいたグラフ
+        //
+        // 逆に少しでもあると吐き出すというイメージだと（パターン２）
+        // （1/n）乗して吐き出す
+        // 上（1）に近づいたグラフになる
+        //
+        // それも今のたまらん方式だと簡単に限界突破してしまうので
+        // 肝心の方式がまったく意味を成していない
+        //
+        // とりあえず式がややこしいのでそういうメモ書き
+        // 
+        // そう考えるとAbsorbの方式もそういうカスタマイズ性を考えた方がいいのかも
+        //
+        // dstpow(n) : nが大きいと、少しでも余裕があれば大きく吐き出す
+        // dstpow(1/n) : nが大きいと、十分に余裕が無ければ吐き出さない
+        double dstlack = EasyMath.PowCurve(_inspdst, dstpow, dstmax);
+        double _loss = _inspsrc * rate * dTime;
+        double _cutoff = _inspsrc * dstlack * rate * dTime;
+        double _loss2 = _loss - _cutoff;
+        if (_loss2 > _inspsrc && _inspsrc >= 0)
+        {
+            _loss2 = _inspsrc;
+        }
+        return _loss2;
+    }
+
+    // インスピから色づきへの吸収量から
+    // カットオフした後の値を返し、参照された引数にカットオフされた値を格納する
+    public double Absorb_Cutoff(double _inspsrc, double _inspdst, double dstmax, float rate, float dstpow, ref double _cutoff)
+    {
+        double dstlack = EasyMath.PowCurve(_inspdst, dstpow, dstmax);
+        double _loss = _inspsrc * rate * dTime;
+        _cutoff = _inspsrc * dstlack * rate * dTime;
+        double _loss2 = _loss - _cutoff;
+        if (_loss2 > _inspsrc && _inspsrc >= 0)
+        {
+            _loss2 = _inspsrc;
+        }
+        return _loss2;
+    }
+
+    public void DownInsp(double _DownInsp)
+    {
+        double _DownInsp2 = _DownInsp;
+        // 低ステージのインスピから消費する
+        if (false)
+        {
+            if (Insp1p() > 0)
+            {
+                // インスピ量がインスピ1より多い場合は
+                // インスピ1を全消費して
+                // 高レベルインスピを消費出来るように残す
+                // そうでない場合はインスピ消費が終わる（_DownInsp2が0になる）
+                if (_DownInsp2 > Insp1p())
+                {
+                    // 純インスピ1値よりDownInspが多い場合
+                    // Insp値から純粋Insp1pからそのまま無くす
+                    // 残ったDownInspをInsp2値から減らす
+                    _DownInsp2 -= Insp1p();
+                    Insp -= Insp1p();
+                }
+                else
+                {
+                    Insp -= _DownInsp2;
+                    _DownInsp2 = 0;
+                }
+            }
+            if (Insp2p() > 0)
+            {
+                if (_DownInsp2 > Insp2p())
+                {
+                    // 純インスピ2値よりDownInspが多い場合
+                    // Insp値から純粋Insp2pからそのまま無くす
+                    // 残ったDownInspをInsp3値から減らす予定
+                    _DownInsp2 -= Insp2p();
+                    Insp -= Insp2p();
+                }
+                else
+                {
+                    Insp2 -= _DownInsp2;
+                    Insp -= _DownInsp2;
+                }
+            }
+        }
+
+        // 高ステージのインスピから消費する
+        if (true)
+        {
+            DownInsp3(_DownInsp);
+        }
+        if (Insp < 0)
+        {
+            InspMinus += -Insp;
+            Insp = 0;
+        }
+    }
+
+    public void DownInsp3(double _DownInsp)
+    {
+        if (Insp3 > 0)
+        {
+            if (_DownInsp > Insp3)
+            {
+                Insp3 = 0;
+            }
+            else
+            {
+                Insp3 -= _DownInsp;
+            }
+        }
+        else
+        {
+            Insp3 = 0;
+        }
+        DownInsp2(_DownInsp);
+    }
+
+    public void DownInsp2(double _DownInsp)
+    {
+        if (Insp2 > 0)
+        {
+            if (_DownInsp > Insp2)
+            {
+                Insp2 = 0;
+            }
+            else
+            {
+                Insp2 -= _DownInsp;
+            }
+        }
+        else
+        {
+            Insp2 = 0;
+        }
+        Insp -= _DownInsp;
+    }
+
+    public double InspVolume()
+    {
+        // Insp1の質量にInsp2の質量を足す
+        return (Insp1p() * GamanVolume()
+            + Insp2Volume());
+    }
+
+    public double Insp2Volume()
+    {
+        return (Insp2p() * 0.1f * GamanVolume()
+            + Insp3Volume());
+    }
+    public double Insp3Volume()
+    {
+        return (Insp3p() * 0.01f * GamanVolume()
+            // + Insp4Volume();
+            + 0);
+    }
+
+    // insp2値以降を除いた純粋なInsp1値
+    // pureのpを取ってる
+    public double Insp1p()
+    {
+        return Insp - Insp2;
+    }
+
+    // Insp1pの率
+    public double Insp1p_Rate()
+    {
+        return Insp1p() / Gaman;
+    }
+
+    // 純粋なInsp2値
+    public double Insp2p()
+    {
+        //return Insp2;
+        return Insp2 - Insp3;
+    }
+
+    public double Insp2p_Rate()
+    {
+        return Insp2p() / Gaman;
+    }
+
+    // 純粋なInsp2値
+    public double Insp3p()
+    {
+        return Insp3;
+        // return Insp3 - Insp4;
+    }
+
+    public double Insp3p_Rate()
+    {
+        return Insp3p() / Gaman;
+    }
+
+    // インスピ減衰量を返す
+    // noadjust（補正なし）
+    public double Insp_Loss(double _insp, bool noadjust = false)
+    {
+        // 色づきの不足によってインスピ低下
+        // 倍率は10?
+        double _loss = _insp
+        * (1 - EasyMath.PowCurve(Iroduki, 5f, Iroduki_Limit))   // 色づきに少しでも余裕があれば大きく吐き出す
+                                                                // * 2
+                * 1
+                // * 0.5
+                * dTime;
+        // 爆発が近いと補正が強くなる
+        if (!noadjust)
+        {
+            _loss +=
+                _insp
+                * (1 - EasyMath.PowCurve(Iroduki, 2f, Iroduki_Limit))
+                * EasyMath.PowCurve(Insp_Rate(_insp), 0.5f, 1)
+                // * 0.5f
+                * 0.2f
+                // * 0.1f
+                * dTime;
+        }
+        // ためこみ値が溜まっていればその分色づきに吸収される
+        // ためこみ値がないとインスピが抑えられないことになる
+        //Insp_Loss *= ((Tamekomi - Iroduki) / Tamekomi_Limit);
+        if (_loss > _insp) _loss = _insp;
+        return _loss;
+    }
+
+    // 現在のインスピ率を返す
+    // 1に近づくほどバクハツが近い
+    public float Insp_Rate(double _insp)
+    {
+        return (float)(_insp / Insp_Limit);
+    }
+
+    // がまん限界に対する現在のインスピ率を返す
+    // 仮実装
+    public float Insp_Rate_B(double _insp)
+    {
+        return (float)(_insp / Gaman_Limit);
+    }
+
+#if False
+    // インスピ上昇テキスト生成
+    public void UpInspPop(double upinsp)
+    {
+        UpInspPop __UpInspPop;
+        __UpInspPop = Instantiate(_UpInspPop, new Vector3(0, 0, 0), Quaternion.identity, IrodukiPopMaster.transform);
+        __UpInspPop.c_text.text = "+" + (upinsp * 100).ToString("F1") + "%";
+        __UpInspPop.Mixture = this;
+        //Random.InitState((int)System.DateTime.Now.Ticks);
+        //NewChildPop.posgx = Random.value * 3.0f - 1.5f;
+        //NewChildPop.posgy = Random.value * 3.0f - 1.50f;
+        __UpInspPop.gameObject.SetActive(true);
+    }
+#endif
+
+    // フレーバー消費
+    // 消費したフレーバーを各フレーバーから分配的に消費する
+    public void Fl_Cons(double n)
+    {
+
+    }
+
+    // ためこみ率
+    public float Tamekomi_Rate()
+    {
+        return (float)(Tamekomi / Tamekomi_Limit);
+    }
+
+    // パーセンテージからインスピ値を取得する
+    public double RateToInsp(double r)
+    {
+        return Gaman * (r / 100);
+    }
+
+    // パーセンテージから色づき値を取得する
+    public double RateToIroduki(double r)
+    {
+        return Iroduki_Limit * (r / 100);
+    }
+
+    // パーセンテージからためこみ値を取得する
+    public double RateToTamekomi(double r)
+    {
+        return Tamekomi_Limit * (r / 100);
+    }
+    void UpdateFkr()
+    {
+        dbg(0, 15, "■ふっくら");
+
+        // ふっくら値は
+        // フレーバーとたまらん値が影響する
+        Fkr = FkrTmrn + FkrFl;
+
+        // ムードで2倍化
+        Fkr *= (1 + uuu.Mood);
+
+        dbg(0, 17, "ふっくら使用中 = " + (fFkr ? "〇" : "×"));
+        dbg(0, 18, "値はふっくら？ = " + (isFkr ? "〇" : "×"));
+
+        if (fFkr)
+        {   
+            // 現在値が影響するのはこの5種類
+            if (isFkr
+                && false
+                )
+            {
+                // 値をふっくらを加算した値として扱う
+                Insp = InspRaw + Fkr;
+                Gaman = GamanRaw + Fkr;
+                Gaman_p = GamanRaw_p + Fkr;
+                Gaman_Limit = GamanRaw_Limit + Fkr;
+                Gaman_Limit_p = GamanRaw_Limit_p + Fkr;
+
+                InspFkr = Insp;
+                GamanFkr = Gaman;
+                GamanFkr_p = Gaman_p;
+                GamanFkr_Limit = Gaman_Limit;
+                GamanFkr_Limit_p = Gaman_Limit_p;
+            }
+            else if (!isFkr) 
+            {
+                // 値を生の値として扱い、これにふっくらを足して補正する
+                InspFkr = Insp + Fkr;
+                GamanFkr = Gaman + Fkr;
+                GamanFkr_p = Gaman_p + Fkr;
+                GamanFkr_Limit = Gaman_Limit + Fkr;
+                GamanFkr_Limit_p = Gaman_Limit_p + Fkr;
+
+                InspRaw = Insp;
+                GamanRaw = Gaman;
+                GamanRaw_p = Gaman_p;
+                GamanRaw_Limit = Gaman_Limit;
+                GamanRaw_Limit_p = Gaman_Limit_p;
+            }
+        }
+        else
+        {
+            // それらはフラグが無ければ通常の値として運用される
+            InspFkr = Insp;
+            GamanFkr = Gaman;
+            GamanFkr_p = Gaman_p;
+            GamanFkr_Limit = Gaman_Limit;
+            GamanFkr_Limit_p = Gaman_Limit_p;
+        }
+
+        if (Insp > 10)
+        {
+            // 異常な数字が出た場合は強制トレースモード
+            uuu.ModeTrace = true;
+        }
+
+
+        if (true
+            // && false
+            )
+        {
+            double UpFkr = Fkr - PreFkr;
+
+            // ふっくら値の上昇分
+            // インスピを変化させる
+            if (UpFkr > 0)
+            {
+                Insp += UpFkr;
+            }
+
+            if (UpFkr < 0)
+            {
+                Insp += UpFkr;
+                if (Insp < 0)
+                {
+                    double d = -Insp;
+                    Insp = 0;
+                    DownInsp(d);
+                }
+            }
+
+            if (Insp > 10)
+            {
+                // 強制停止
+                uuu.ModeTrace = true;
+            }
+
+            PreFkr = Fkr;
+        }
+    }
+    void UpdateBakuhatuParam()
+    {
+        if (bkht == null)
+        {
+            bkht = new(un); 
+        }
+
+        bkht.Update();
+
+#if b56
+        //***********************************************************************
+        //***********************************************************************
+        //***********************************************************************
+        //***********************************************************************
+        //***********************************************************************
+        //***********************************************************************
+        // バクハツ状態
+        //
+        // ■こみあげ
+        // バクハツの第一段階
+        // インスピ限界超過時（ふんばり状態）
+        // こみあげ値がインスピ限界超過に応じて、特定の割合まで増加する（たとえば30%など）
+        // この「こみあげ値」がバクハツを通じて、生産される総量となる
+        // （仕様変更の可能性あり）
+        //
+        // ■ふんばり
+        // うにおんはこみあげるとこみあげたものをふんばって生産をしようとする
+        // 「こみあげ値」が増加するとふんばり値が増加して
+        // 「こみあげ値」のうち、さらに特定の割合で生産を行おうとする
+        // これを脈動的に繰り返して、すこしずつこみ上げたものを吐き出して生産を行う
+        // インスピ超過量が高い場合、「こみあげ値」の割合と「ふんばり値」の割合が増加して
+        // より少ない回数で、大きな生産物をひとかたまりで一気に生産する
+        //
+        // ■うまれる
+        // うまれる値は一定の時間でふんばり値と同じ値に達して
+        // うまれる値と同じインスピ値を持つ生産物を吐き出す
+        // 一定の時間で脈動するように生産させるために
+        // どっくん値は規則的にふんばり値に達するように増加する
+
+        //***********************************************************************
+        //***********************************************************************
+
+        double _InspVolume = InspVolume();
+        double iv = _InspVolume;
+        double tr = iv;           // トリガー値（現在インスピ質量）
+
+        //Insp_Ratio = (Insp + Tamaran) / (Insp_Limit + Tamaran);     // インスピ率
+        //Insp_Over = (Insp > Insp_Limit) ? (Insp + Tamaran - Insp_Limit) / (Insp_Limit + Tamaran) : 0;   // インスピ超過率
+        Insp_Ratio = (tr) / Insp_Limit;     // インスピ率
+        Insp_Over = (tr > Insp_Limit) ? (tr - Insp_Limit) / (Insp_Limit) : 0;   // インスピ超過率
+        Tamaran_Ratio = (Tamaran) / Insp_Limit;  // たまらん率
+        Tamaran_Over = (Tamaran > Insp_Limit) ? (Tamaran - Insp_Limit) / (Insp_Limit) : 0;   // たまらん超過率
+
+        // ■こみあげ
+        // 溜まっていないものはこみ上げようがない
+        // インスピが生産限界だが、そこからさらにがまん値が限界値を絞る
+        Komiage_Limit = Insp;
+        //Komiage *= 1.0f - 0.1f * dTime;
+        //Komiage -= 0.1f * dTime;
+        Komiage *= 1.0f - 0.05f * dTime;
+        Komiage -= 0.05f * dTime;
+        MaxKomiageRate *= 1 - 0.025 * KomiageCr() * dTime;        // すっきりと同じ速度でこみ上げ最大値が減る
+        Sukkiri *= 1 - 0.025 * KomiageCr() * dTime;             　// 少しでもこみ上げたらすっきりが直らない
+
+        Funbari *= 1.0f - 0.1f * dTime;
+        if (Komiage < 0.000001) Komiage = 0;
+        if (Funbari < 0.000001) Funbari = 0;
+
+        // ■たまらんミックス
+        // 当初ミクスチャ量によってUpdateInspLimit()内でインスピ許容値が下がる仕様だった
+        // 現在インスピ値に対して補正値をかけてバクハツしやすくしている
+        // またこみあげ値の上昇でさらに補正値がつき、歯止めが利かなくなる
+        // （最大インスピ限界の20%）
+        TamaranMix =
+            EasyMath.ConvTo(dMix, Gaman * 0.99, Gaman * 0.2)  // ミクスチャがたまらん率
+                                                              // ミクスチャによって「たまらん」状態になり、インスピに補正値がかかる
+            * Gaman / Gaman_Limit                             // がまん（色づき状態）によって補正がかかる                                                                            
+            ;
+
+        // ■たまらんインスピ
+        // こみあげるとインスピ補正値が下がらなくなり
+        // 生産してもすぐにはたまらん値が下がらなくなる
+        Tamaran_Insp *= 1.0f - 0.1f * Mathf.Pow(1 - (float)(Haki_Komi / Iroduki_Limit), 5) * dTime;
+        if (Tamaran_Insp < tr) Tamaran_Insp += (tr - Tamaran_Insp) * 5.0f * dTime;
+
+        // たまらんＡ値へのがまん補正
+        // 色づきが高ければ高いほど、たまらん値への影響が大きくなる
+        double Tamaran_GamanCr = Mathf.Pow((float)(Gaman / Gaman_Limit), 3);
+        double tg = Tamaran_GamanCr;                                        // 以下tg値
+
+        // 一度こみあげたら、追加補正がかかり……たまらん、もうガマン出来ない！！
+        Tamaran_A +=
+            (Gaman) *
+            (Haki_Komi / Gaman_Limit) * 2.0f * tg * dTime 　　　　　   // こみあげ補正
+            + Haki * (Haki_Komi / Gaman_Limit) * 10.0f * tg * dTime　  // はきだし補正
+            ;
+
+        Tamaran_A *= 1 - 0.1 * dTime;
+
+        //double _Tamaran;
+        //_Tamaran = Tamaran_Insp
+        //    + TamaranMix 
+        //    + Haki * (Haki_Komi / Insp_Limit) * 5
+        //    // 一度こみあげたら、追加補正がかかり……たまらん、もうガマン出来ない！！
+        //    //+ (Insp_Limit_Base2) * (Komiage / Iroduki_Limit);
+        //    + (Insp_Limit) * (Haki_Komi / Insp_Limit) * 2;
+
+        Tamaran = Tamaran_Insp + TamaranMix + Tamaran_A;
+
+        //Tamaran += (_Tamaran - Tamaran) * dTime * 1.0f;
+
+        //Tamaran = TamaranMix * (Komiage / Iroduki_Limit);        // 一度こみあげたらもうガマン出来ない
+
+        if (Union.TestCode == "Manjutane")
+        {
+            //Tamaran = 0;
+        }
+
+        
+
+        // dProduct *= 0.99;
+
+        // ふんばり値についてのメモ
+        // インスピ限界に対して
+        // インスピ（たまらん）が2倍の値で 50% のふんばり
+        // ex) インスピ200/100の場合、(200-100) / 200 = 50%
+        // 4倍の値で 75% のふんばり
+        // ex) インスピ400/100の場合、(400-100) / 400 = 75%
+        // 10倍で 90%
+        // ex) インスピ1000/100の場合、(1000-100) / 1000 = 90%
+        // 1.5倍で 33% くらい
+
+        // b50
+        // インスピ値と色づき値が実質統一された仕様変更に伴って
+        // インスピ超過が従来の1割程度になっているので
+        // ふんばり値をそれに合わせて修正するべきか
+        // 超過20%で50%
+        // // ex) インスピ120/100の場合、(120-100) / 120 = 50%
+        // 120の部分を200にするために、100を引いて10をかける
+        // 超過40%で75%
+        // 超過100%で90%
+        // ……どうだろうか？
+
+        // b42
+        // ふんばりに溜めを作るために
+        // ふんばりとこみあげの目標値をずらす
+        // ふんばりの値の方が初期は低めになり、後期は速めになる
+        // これにより、初期のどっくんが遅延して
+        // 十分にこみあげ値を上げることが目的
+        //double Funbari_Goal = (iv) * (Komiage / (Iroduki_Limit + 0.01f)) * (Haki_Komi_b / (Iroduki_Limit + 0.01f));
+        //double Dokkun_Goal = (iv) * (Haki_Komi / (Iroduki_Limit + 0.01f)) * (Komiage / (Iroduki_Limit + 0.01f));
+        //double Funbari_Goal = (Insp) * (Komiage / (Iroduki_Limit + 0.01f)) * (Haki_Komi_b / (Iroduki_Limit + 0.01f));
+        //double Dokkun_Goal = (Insp) * (Haki_Komi / (Iroduki_Limit + 0.01f)) * (Komiage / (Iroduki_Limit + 0.01f));
+        //double Funbari_Goal = (iv) * (Komiage / (Insp + 0.01f)) * (Haki_Komi_b / (Insp + 0.01f));
+        //double Dokkun_Goal = (iv) * (Haki_Komi / (Insp + 0.01f)) * (Komiage / (Insp + 0.01f));
+
+        //double Funbari_Goal = (insp) * (Komiage / (Insp_Limit + 0.01f)) * (Haki_Komi_b / (Insp_Limit + 0.01f));
+        //double Dokkun_Goal = (insp) * (Haki_Komi / (Insp_Limit + 0.01f)) * (Komiage / (Insp_Limit + 0.01f));
+
+        //double Funbari_Goal = (Insp) * (Haki_Komi / (Insp_Limit + 0.01f));
+
+        // ふんばり率（インスピに対してこみ上げた割合（ほぼこみあげ率））
+        Funbari_Rate = Haki_Komi / (Insp + 0.01f);
+        //Funbari_Rate = Komiage / (Insp + 0.01f);
+        if (Funbari_Rate < 0) Funbari_Rate = 0;
+        if (Funbari_Rate > 1) Funbari_Rate = 1;
+
+        // 未生産のこみあげ値
+        double fg_a;
+        if (Haki_Komi > Haki_Komi_b) fg_a = Haki_Komi_b;
+        else fg_a = Haki_Komi;
+
+        // 調整とマイナスインスピ実装に伴って不要
+        // if (fg_a > Insp + 0.01f) fg_a = Insp + 0.01f; 
+
+        double fg_b = fg_a * Funbari_Rate;                              　// 未生産のこみあげ値に対して、1脈動で吐き出す値
+        // double fg_a = (Haki_Komi_b) * Funbari_Rate;                   // 未生産のこみあげ値に対して、1脈動で吐き出す値
+        // double Funbari_Goal = (Insp) * (Haki_Komi / (Insp_Limit + 0.01f)) * (Haki_Komi_b / (Insp_Limit + 0.01f));
+        double Funbari_Goal = fg_b + 0.0001f;
+        double Dokkun_Goal = (Insp) * (Haki_Komi / (Insp_Limit + 0.01f)) * (Komiage / (Insp_Limit + 0.01f));
+        // 色づき中のこみあげ量が、これから生産したい量
+        // そのうち、さらにこみあげの量だけ生産量を決定する
+        // すでに吐き出した量は差し引いて計算する
+        Haki_Komi_b += (Haki_Komi - Haki_Komi_b) * 0.5f * dTime;
+        if (true)
+        {
+            if (Haki_Komi > 0.0001f ||
+               (Tamaran > Insp_Limit && Insp > 0.01f))
+            //if (Tamaran > Insp_Limit && Insp > 0.01f)
+            {
+                //double _Komiage;
+
+                // b50版
+                // double Komiage_Rate;     // インスピに対するこみ上げの割合
+                // インスピ超過によってこの割合が変化する
+                // 20%超過で50%、40%超過で75%、100%超過で90%
+                // 逆数的な割合になってる
+
+                //double t = 0.1f;
+                double t = 1.0;                         // しきい値（10%だと10%超えで50%に、100%だと100%超えで50%）
+
+                double a = Tamaran - Insp_Limit;        // インスピ超過量
+                double b = a / Insp_Limit;              // インスピ超過率（たとえば10%）
+
+                b = b + t;
+                // b = b + 0.1f;                        // しきい値10%の時
+                // 超過率10%以下でレートマイナス化を防ぐために
+                // 超過率に10%補正をかける（10%→20%になる）
+
+                double bt = b * (1.0f / t);
+                //double b10 = b * 10;                  // しきい値10%の時に10倍化（20%→2になる）
+                // つまり、逆数をかける
+
+                Komiage_Rate = (bt - 1) / bt;
+                //Komiage_Rate = (b10 - 1) / b10;       // しきい値10%の時
+                // 10%の場合  : 2 - 1 / 2 = 50%
+                // 30%の場合  : 4 - 1 / 4 = 75%
+                // 90%の場合  : 10 - 1 / 10 = 90%
+                // 0%の場合   : 1 - 1 / 1 = 0%
+
+                // こみ上げは0以上、1以下
+                if (Komiage_Rate < 0) Komiage_Rate = 0;
+                if (Komiage_Rate > 1) Komiage_Rate = 1;
+
+                Komiage = Komiage_Rate * Insp;          // インスピのうち、この割合を「こみあげ」で生産する
+                //Komiage_b = Komiage_Rate * Insp;      // インスピのうち、この割合を「こみあげ」で生産する
+
+                //if (Komiage_b > Komiage) Komiage = Komiage_b;
+                //Komiage *= 1.0f - 0.001f * dTime;
+
+                // b49まで
+                //Komiage = ((Tamaran - Insp_Limit) / Tamaran) * Insp;
+                //Komiage = ((Tamaran - Insp_Limit) / Tamaran) * Iroduki_Limit;
+
+                //Komiage += (_Komiage - Komiage) * dTime * 1.0f;
+
+                if (Komiage_Rate > MaxKomiageRate) MaxKomiageRate = Komiage_Rate;     // こみあげ最大値更新
+                /*if (Score < MaxKomiageRate * 100
+                    && Komiage > 0.0001f
+                    && Haki_Komi > 0.0001f)
+                { 
+                    Score = MaxKomiageRate * 100;       // スコア更新
+                }*/
+            }
+            else
+            {
+                // Komiage = 0;
+            }
+
+            // こみ上げたものは最後まで吐き出すようにするために
+            // こみあげ値の低下で0にならないようにする
+            // 増える時だけ適用する
+            UpdateHakikomi();
+
+            if (Funbari < 0) Funbari = 0;
+            if (Haki_Komi > 0)
+            {
+                Funbari +=
+                    (Funbari_Goal - Funbari)
+                    * 0.5f * dTime;
+            }
+            if (Funbari > Funbari_Goal) Funbari = Funbari_Goal;
+            //if (Funbari > Mathf.Pow((float)Komiage, 2) / Insp_Limit) Funbari = 0;
+
+            if (Umareru < 0) Umareru = 0;
+            if (Funbari > 0)
+            {
+                // 2秒で踏ん張りの値と等価になる計算
+                Umareru += Funbari * 0.5f * dTime;
+            }
+            //if (Funbari > Mathf.Pow((float)Komiage, 2) / Insp_Limit) Funbari = Mathf.Pow((float)Komiage, 2) / Insp_Limit;
+            /*if (Dokkun > Funbari_Goal)
+            {
+                Haki += Dokkun;
+                Dokkun = 0;
+                Funbari = 0;
+            }*/
+
+            //Haki *= 1 - 0.01f * dTime;
+            Haki *= 1 - 0.025 * KomiageCr() * dTime;             // こみあげ中ははきだし値が減らない
+            Haki_Rate *= 1 - 0.025 * KomiageCr() * dTime;        // こみあげ中ははきだし値が減らない
+            //if (Haki > Komiage) Haki = Komiage;
+
+            //Umareru = Dokkun;       // うまれる値（順次どっくん値から以降）
+
+            // バクハツ後にうまれた値がゴミとして残るので処理
+            if (Insp_Rate(Tamaran) < 1.0f)
+            {
+                //Umareta = 0;
+                Umareta *= 1 - 0.01f * dTime;
+                Umareta -= 0.0001f * dTime;
+                if (Umareta < 0) Umareta = 0;
+            }
+        }
+
+        // b41
+        if (false)
+        {
+            if (Tamaran > Insp_Limit && Komiage_Limit > 0)
+            {
+                // （×）こみ上げ値は色づき（Iroduki = Komiage_limit）以上は上がらない
+
+                // こみあげ値の上限は色づきとインスピ値
+                // こみあげ限界は実質の生産上限となっており
+                // 現在の仕様ではためこみ値から生産出来る値を、色づき値が決める
+                // こみあげ限界値は、現在色づき値と同値
+                // こみ上げ用係数
+                // インスピ限界を超えた場合のこみあげ量を決める係数 (Komiage_Power = 0.005f)
+                Komiage += ((Tamaran - Insp_Limit) * Komiage_Power)
+                    * (1.0f - Komiage / Komiage_Limit)
+                    * 50.0f * dTime;
+
+                if (Komiage > MaxKomiage) MaxKomiage = Komiage;     // こみあげ最大値更新
+
+                // こみあげた量によってインスピ許容値が下がる
+                /*if (Tamaran / Insp_Limit_Base < Komiage / (Iroduki_Limit + Insp + 0.01f))
+                {
+                    Tamaran += ((Komiage * (Insp_Limit_Base / (Iroduki_Limit + Insp + 0.01f)))
+                        - Tamaran) * 0.05;
+                    if (Tamaran > Insp_Limit_Base * 0.99) Tamaran = Insp_Limit_Base * 0.99;
+                       // * 0.01f;
+                }*/
+
+
+            }
+            //Insp_Limit = Insp_Limit_Base - Tamaran;
+            //Iroduki_Limit = Iroduki_Limit_Base - Tamaran;
+            Tamaran *= 1 - (0.005 * dTime) * Sukkiri_Invalid_Rate_B(1, 1);
+            // 0.9999 + 0.0001 * Sukkiri_Rate();
+
+            //if (Komiage > Komiage_Limit) Komiage = Komiage_Limit;
+            if (Komiage > Iroduki)
+            {
+                Komiage = Iroduki;
+            }
+            if (Komiage < 0) Komiage = 0;
+
+            //Funbari += ((Insp - Insp_Limit) / 1000) * ((Komiage - dProduct) / Komiage_Limit);
+            // インスピがあるから踏ん張る？
+            // こみあげるから踏ん張る？
+            // しっかりミクスチャすれば、しっかり踏ん張って十分な生産が出来る
+            if (Komiage > 0)
+            {
+                if (Funbari < 0) Funbari = 0;
+                //Funbari += ((Insp - Insp_Limit) / 1000f) * ((Komiage - dProduct) / (Komiage_Limit + 0.1f)) * (1.0f - Funbari / (Komiage + 0.1f));
+                //Funbari += ((Komiage - dProduct) / (Komiage_Limit + 0.0f)) * 0.1f * (1.0f - Funbari / (Komiage + 0.0f));
+                // 0.015 ?
+                //Funbari += ((Komiage - dProduct) / (Komiage_Limit + 0.001f)) * (0.015f + (Insp_Ratio * 0.000f)) * Mathf.Pow((float)(1.0f - Mathf.Abs((float)Funbari) / (Komiage + 0.001f)), 1.5f);
+
+                // ふんばり値
+                // こみあげた場合、その量に応じてふんばり値が増加する
+                // ふんばった分だけどっくん値が増加して、バクハツの引き金になる
+                // どっくん値に達するまでの間、どれだけ踏ん張るかで生産物の大きさが決まる
+                // ふんばり用係数
+                // こみあげた場合のふんばり量が増加する係数 (Funbari_Power = 0.015f)
+                // こみあげた場合、インスピ量によるふんばり増加ボーナス（Funbari_InspBonus = 0.000f）
+                // ふんばりが高すぎてこみあげが枯渇してしまうのを防ぐ係数
+                // こみあげに対するふんばり量を出来るだけ 1.0 から遠さげる乗数 (FunbarisugiPenaltyPow = 3.0f)
+                Funbari += ((Komiage - dProduct) / (Komiage_Limit + 0.001f))
+                    * (Funbari_Power + (Tamaran_Ratio * Funbari_InspBonus))
+                    * Mathf.Pow(Mathf.Abs((float)(1.0f - Funbari / (Komiage + 0.001f))), FunbarisugiPenaltyPow)
+                    * 50.0f * dTime;
+
+                // こみあげ限界値ボーナス
+                // こみあげ量がインスピ限界値に近づくと、ふんばりも連鎖的にインスピ限界値に近づくボーナスが発生
+                // これにより大きな生産物を作ることが出来る
+                // ふんばり用係数２
+                // こみあげがどれだけ色づき限界値に近づく必要があるかを決める乗数 (Funbari_KomiageBonusPow = 5.0f)
+                // このボーナスのインスピ量による増加ボーナス (Funbari_KomiageBonusInspBonus = 0.02f)
+                Funbari += ((Komiage - dProduct) - (Funbari - dProduct))
+                    * Mathf.Pow((float)(Komiage / Insp_Limit + 0.001f), Funbari_KomiageBonusPow) * (Tamaran_Ratio * Funbari_KomiageBonusInspBonus) // こみあげ限界値ボーナス
+                    * 50.0f * dTime;
+            }
+            if (Funbari > Komiage) Funbari = Komiage;
+            if (Funbari < 0) Funbari = 0;
+
+            if (Funbari > 0)
+            {
+                //Dokkun += EasyMath.ConvTo((0.5f + (Insp / Insp_Limit) * 0.5f) * (Funbari - dProduct), 2.0f, 100);
+                //Dokkun += EasyMath.ConvTo((Komiage - dProduct), 0.05f, 100);
+
+                // どっくん値
+                // 
+                // ふんばりがインスピ限界値に近づくと、脈動に大きな溜めが入る
+                // どっくん値用係数
+                // ふんばった場合の脈動が速くなる係数 (Dokkun_Power = 0.075f)
+                // ふんばり中の、インスピ値超過量によるどっくん値増加ボーナス（Dokkun_InspOverBonus = 0.000f）
+                // どれだけインスピ限界値に近づく必要があるかを決める乗数 (Dokkun_FunbariBonusPow = 5.0f)
+                // 0.05?
+                Umareru += (Funbari - dProduct)
+                    //* (Dokkun_Power - (Insp_Over * Dokkun_FunbariInspOverBonus))
+                    //* (Mathf.Pow(Mathf.Abs((float)(1.0f - Funbari / Insp_Limit_Base)), Dokkun_FunbariBonusPow) + 0.02f)　 // ふんばり限界値ボーナス
+                    * (Dokkun_Power - (Insp_Over * Dokkun_KomiageInspOverBonus))
+                    * (Mathf.Pow(Mathf.Abs((float)(1.0f - Komiage / Insp_Limit)), Dokkun_KomiageBonusPow) + 0.05f)　// こみあげ限界値ボーナス
+                    * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5.0f)                                                          // すっきり値ペナルティ
+                    * 50.0f * dTime;
+            }
+        }
+        //if (Dokkun < 0) Dokkun = 0;
+
+        // 色づきポンプ（色づきからインスピに値が送られる）
+        // double IrodukiPump = 0;
+        /*double IrodukiPump = Komiage
+            * (Iroduki / Iroduki_Limit)
+            * (1 - Sukkiri_Rate())
+            * 0.05f;*/
+        //double IrodukiAntiPump = 0;
+        /*double IrodukiAntiPump = Komiage
+            * (Insp - Insp_Limit)
+            * 0.01
+            * Sukkiri_Rate();*/
+
+        /*Komiage
+        * ((Insp - Insp_Limit) * 10 - Iroduki) / Iroduki_Limit)
+
+        * 0.01f;*/
+        //Insp += IrodukiPump - IrodukiAntiPump;     // こみ上げたら歯止めが利かなくなる
+        //Iroduki -= IrodukiPump - IrodukiAntiPump;
+        //Insp += Funbari * 0.05f; // こみ上げたら歯止めが利かなくなる
+        //if (Komiage >= 1.0f && (Funbari - dProduct) > Komiage)  // 完成
+        //if (Funbari > 0 && Komiage > 0 && Dokkun > Komiage)  // 完成
+        //if (Dokkun > Dokkun_Goal)
+        if (Umareru > Funbari)
+        {
+            Kansei();
+        }
+
+        // スコア表示
+        if (Komiage < 0.00001f && Score != 0)
+        {
+            // スコアが100以外では通常表示
+            // 100の場合はインスピ超過が無くなるのを待つ
+            if (Score != 100 ||
+                (Score == 100 && Tamaran_Over == 0))
+            {
+                Union.Result((int)(Score));
+                Score = 0;
+            }
+        }
+#endif
+    }
+
+    public void UpdateHakikomi()
+    {
+        //********************************************************
+        // ここの計算に際し
+        // バクハツ中にさらにインスピが追加されてしまった場合は？
+        //********************************************************
+        // ・(1 - Haki_Rate)
+        // つまり吐いた残りが現在のInsp量
+        //
+        // ・a = (MaxKomiageRate - Haki_Rate)
+        // 吐き切れていない確率
+        //
+        // ・b = a /（1 - Haki_rate）
+        // 残った確率に対する、吐き切れていない確率の割合
+        double a = (MaxKomiageRate - Haki_Rate);
+        double b = 0;
+
+        // 吐き出し率が100を超えたら、b = 0
+        if (1 - Haki_Rate > 0.01f)
+        {
+            b = a / (1 - Haki_Rate);
+        }
+
+        if (Haki_Komi < Insp * b)
+        {
+            Haki_Komi = Insp * b;
+            // はきこみ値は確実に吐き出すまで収束しない
+        }
+        //if (Haki > Komiage)
+        //{
+        //    Haki_Komi = 0;
+        //}
+
+        // 少量のはきこみを0に収束させる
+        Haki_Komi -= 0.001f * dTime;
+        if (Haki_Komi < 0) Haki_Komi = 0;
+    }
+
+    void UpdateInsp()
+    {
+        if (uuu.TestCode == "Kurimanju")
+        {
+            // インスピ増加量
+            double UpInsp = ddMixSukkiri;
+
+            // 最終的にインスピ増加した後
+            // 各チャンネルにインスピを分配する形がいいか？
+            // だから直接チャンネルにUpInspを追加しない感じとか
+            if (InspMinus > 0)
+            {
+                // b56からマイナスインスピを直接減らす仕様を無くし
+                // インスピから自然吸収する形に変更する
+                if (mInspMinus == "absorb")  // すこしずつ吸収
+                {
+                    Insp += UpInsp;
+                    if (Insp > 0)
+                    {
+                        // マイナスインスピ吸収率1%
+                        //double _DownInsp = (InspMinus * 0.01f) * dTime;
+                        //double _DownInsp = (InspMinus * 0.1f) * dTime;
+                        float r = Mathf.Clamp(Gaman_Rate(), 0.1f, 1);
+                        
+                        double _DownInsp = (InspMinus * 1.0f) * r * dTime;
+                        DownInsp(_DownInsp);
+                        InspMinus -= _DownInsp;
+                        dbg(0, 13, "_DownInsp = " + _DownInsp.ToString("F8"));
+                        if (Insp < 0)
+                        {
+                            InspMinus += -Insp;
+                            Insp = 0;
+                        }
+                    }
+                }
+
+                if (mInspMinus == "minus")  // ただのマイナス値扱い
+                {
+                    InspMinus -= UpInsp;
+                    if (InspMinus < 0)
+                    {
+                        InspMinus = 0;
+                        Insp += -InspMinus;
+                    }
+                }
+            }
+            else if (InspMinus < 0)
+            {
+                // InspMinusがマイナスの場合
+                // インスピに上昇補正がかかっている
+                // バクハツ時の仕様
+                Insp += UpInsp;
+                double UpInsp2 = Insp * 0.01f * (-InspMinus) * 0.01f * dTime;
+                Insp -= UpInsp2;
+                InspMinus += UpInsp2;
+
+            }
+            else
+            {
+                Insp += UpInsp;
+            }
+
+            // 色気づきから秒間0.01%ずつ増加
+            /*
+            if (Irk > 0)
+            {
+                Insp += Irk * 0.0001 * dTime;
+                Irk -= Irk * 0.0001 * dTime;
+            }*/
+
+            // dUpInsp & 子ポップ生成は一時停止
+            // dUpInsp += UpInsp / Iroduki_Capacity;
+            // 色づき単位でどの程度のインスピを送り込んでいるか？
+            // 子ポップ生成用
+
+            while (false && dUpInsp > 0.1f)
+            {
+                // 湧かせる
+                _Iroduki_ChildPop NewChildPop = new();
+                NewChildPop.obj = Instantiate(ICPop_0_1, new Vector3(0, 0, 0), Quaternion.identity, ui.ip.InspPopMaster.transform);
+                NewChildPop.time = 5.0f;
+                NewChildPop.posx = 0;
+                NewChildPop.posy = 0;
+                Random.InitState((int)System.DateTime.Now.Ticks);
+                NewChildPop.posgx = Random.value * 3.0f - 1.5f;
+                NewChildPop.posgy = Random.value * 3.0f - 1.50f;
+                NewChildPop.obj.SetActive(true);
+                //NewChildPop.obj.
+
+                if (Iroduki_ChildPop == null)
+                {
+                    Iroduki_ChildPop = new List<_Iroduki_ChildPop>();
+                }
+                Iroduki_ChildPop.Add(NewChildPop);
+                Iroduki_nChildPop++;
+
+                /*GameObject NewProdPop;
+                NewProdPop = Instantiate(ProdPopOrg, new Vector3(0, 0, 0), Quaternion.identity);
+                NewProdPop.GetComponent<ProdPop>().Product = Producable();
+                NewProdPop.GetComponent<ProdPop>().Sukkiri = a;
+                NewProdPop.GetComponent<ProdPop>().Uni_Mxt = this;
+                NewProdPop.GetComponent<ProdPop>().times = 1;               // 応急処置：timesが０だと表示時間なしと見なされて消去される？
+                ProdPops.Add(NewProdPop);
+
+                NewProduct = Instantiate(Prod_Syrup_Org, new Vector3(0, 0, 0), Quaternion.identity);
+                NewProduct.GetComponent<Product>().Grade = (int)(b / 1);        // シロップの生産量は1の倍数
+                }
+                NewProduct.SetActive(false);
+                NewProduct.GetComponent<Product>().Union = Union;
+                NewProduct.GetComponent<Product>().Born_Pos = Union.transform.Find("Anim/Shadow_Pos").gameObject.transform.position.y;
+                ProductFlavors.Add(NewProduct);
+                Birth(b);*/
+
+                //Iroduki_ChildPop.Add = new GameObject;
+
+                dUpInsp -= 0.1f;
+            }
+
+            // インスピ0が50%でインスピ1が開通
+            // 50% - 100%の範囲で倍率が 0 - 1 で変化
+            /*if (Insp / Insp_Limit > 0.5) {
+                float Insp1_Rate = (float)((Insp / Insp_Limit) - 0.5) * 2;
+                if (Insp1_Rate > 1) Insp1_Rate = 1;
+                Insp1 += UpInsp * Insp1_Rate;
+            }
+            // さらにインスピ1が80%でインスピ2が開通
+            // 80% - 160%の範囲で倍率が 0 - 1 で変化
+            if (Insp1 / Insp_Limit > 0.8)
+            {
+                float Insp2_Rate = (float)((Insp1 / Insp_Limit) - 0.8) * (1.0f / 0.8f);
+                if (Insp2_Rate > 1) Insp2_Rate = 1;
+                Insp2 += UpInsp * Insp2_Rate;
+            }
+            // さらにインスピ2が90%を超えるとインスピ3が開通
+            // 90% - 200%の範囲で倍率が 0 - 1 で変化
+            if (Insp2 / Insp_Limit > 1)
+            {
+                float Insp3_Rate = (float)((Insp2 / Insp_Limit) - 0.9) * (1.0f / 1.1f);
+                if (Insp3_Rate > 1) Insp3_Rate = 1;
+                Insp3 += UpInsp * Insp3_Rate;
+            }*/
+        }
+
+        // (まんじゅうたね)
+        // インスピは常時増加
+        // 増加したインスピに対してアクションを勝手に起こすが
+        // 右クリックでそれをガマンする
+        // Gaman値の役割の変化に伴い
+        // このセクションは削除予定
+        if (false) // Union.TestCode == "Manjutane")
+        {
+            // 0.01 = 色っぽい空気
+            Insp += 0.01 *
+                (1 + Gaman * 0.01) *    // ガマンの1%の進行速度でインスピレーションが溜まる
+                dTime;
+            // 警告
+            if (Insp > 0.01 * 100)
+            {
+                double InspOver = Insp - 0.01 * 100;                    // 「警告」のためのインスピ超過量
+                Birth(0.01 *
+                    EasyMath.Gaman(InspOver, Gaman) *                   // 超過量に対してガマンした分だけ生産が抑えられる
+                    dTime);
+                // 秒間 0.01 の生産
+
+                // 生産した分だけガマン強さが低下する
+                // Gaman_Exp -= 0.01 *
+                //    EasyMath.Gaman(InspOver, Gaman) *                   // 超過量に対してガマンした分だけガマン強さの低下が抑えられる
+                //    0.1 *                                               // 補正値 10%
+                //    dTime;
+
+                // Gaman -= (1 - EasyMath.Gaman(InspOver, Gaman)) * 0.01 * dTime;       // 生産量を抑えた分だけガマンを消費する
+                // Gaman_Exp += (1 - EasyMath.Gaman(InspOver, Gaman)) * 0.01 * dTime;   // 生産を抑えた分だけガマン強さが上昇する
+            }
+            // 考える（最初のフレーバー？）
+            // 0.015の速度でインスピが溜まり、0.02の速度で生産する
+
+            //Union.FlavorThink()
+            /*if (Insp > 0.02 * 100)
+            {
+                double InspOver = Insp - 0.02 * 100;                    // 「考える」のためのインスピ超過量
+                double InspOverRatio = EasyMath.Yeast(InspOver / (0.02 * 100));
+
+                double GamanAmount = ; // ガマン量
+                double FlavorGaman = EasyMath.Gaman(InspOver, Gaman);
+                Union.FlavorThink.Level = InspOverRatio;
+
+                // 「考える」と0.015の速度でインスピレーションが溜まる
+                // ただし超過した分のみ・考えるのをガマンした分は抑えられる
+                Insp += 0.015 *
+                    InspOverRatio *                                     // ただし超過した分のみ
+                    FlavorGaman *                                       // 考えるのをガマンした分は抑えられる
+                    (1 + Gaman * 0.01) *                                // ガマンの1%の進行速度でインスピレーションが溜まる
+                    dTime;
+
+                dProduct += 0.02 *
+                    InspOverRatio *                                     // 超過した分のみ
+                    FlavorGaman *                   // 超過量に対してガマンした分だけ生産が抑えられる
+                    dTime;
+                // 秒間 0.01 の生産
+
+                // 生産した分だけガマン強さが低下する
+                Gaman_Exp -= 0.02 *
+                    FlavorGaman *                   // 超過量に対してガマンした分だけガマン強さの低下が抑えられる
+                    0.1 *                                               // 補正値 10%
+                    dTime;
+
+                Gaman -= (1 - FlavorGaman) * 0.02 * dTime;       // 生産量を抑えた分だけガマンを消費する
+                Gaman_Exp += (1 - FlavorGaman) * 0.02 * dTime;   // 生産を抑えた分だけガマン強さが上昇する
+            }*/
+
+            // 見る
+            // 0.03の速度でインスピが溜まり、0.05の速度で生産する
+            if (Insp > 0.05 * 100)
+            {
+                double InspOver = Insp - 0.05 * 100;                    // 「考える」のためのインスピ超過量
+                double InspOverRatio = EasyMath.Yeast(InspOver / (0.05 * 100));
+
+                uuu.FlavorLook.Level = InspOverRatio;
+
+                // 「考える」と0.03の速度でインスピレーションが溜まる
+                // ただし超過した分のみ・考えるのをガマンした分は抑えられる
+                Insp += 0.03 *
+                    InspOverRatio *                                     // ただし超過した分のみ
+                    EasyMath.Gaman(InspOver, Gaman) *                   // 考えるのをガマンした分は抑えられる
+                    (1 + Gaman * 0.01) *                                // ガマンの1%の進行速度でインスピレーションが溜まる
+                    dTime;
+
+                Birth(0.05 *
+                    InspOverRatio *                                     // 超過した分のみ
+                    EasyMath.Gaman(InspOver, Gaman) *                   // 超過量に対してガマンした分だけ生産が抑えられる
+                    dTime);
+                // 秒間 0.01 の生産
+
+                // 生産した分だけガマン強さが低下する
+                // Gaman_Exp -= 0.05 *
+                //    EasyMath.Gaman(InspOver, Gaman) *                   // 超過量に対してガマンした分だけ低下が抑えられる
+                //    0.1 *                                               // 補正値 10%
+                //    dTime;
+
+                // Gaman -= (1 - EasyMath.Gaman(InspOver, Gaman)) * 0.05 * dTime;       // 生産量を抑えた分だけガマンを消費する
+                // Gaman_Exp += (1 - EasyMath.Gaman(InspOver, Gaman)) * 0.05 * dTime;   // 生産を抑えた分だけガマン強さが上昇する
+            }
+            // if (Gaman_Exp < 0) Gaman_Exp = 0;
+            // Gaman_Level = 0.01 * Mathf.Sqrt((float)(Gaman_Exp / 10.00f)); // ガマンレベル計算式
+            // Gaman *= 1 - 0.5 * dTime;                                       // 秒間 1% ガマン減衰
+            // Gaman -= 0.01 * dTime;                                         // 秒間 0.01ガマン減衰
+            // if (Gaman < 0) Gaman = 0;
+        }
+
+        //***********************************************************************
+        //***********************************************************************
+        //***********************************************************************
+        //***********************************************************************
+        //***********************************************************************
+        //***********************************************************************
+        // インスピ減衰処理
+
+        // インスピ減衰
+        if (uuu.TestCode == "Kurimanju")
+        {
+            // 色づきの不足によってインスピ低下
+            // 倍率は10?
+            /*Insp_Loss = Insp
+                * (1 - EasyMath.PowCurve(Iroduki, 5f, Iroduki_Limit))
+                * 2
+                * dTime;
+            // 爆発が近いと補正が強くなる
+            Insp_Loss +=
+                Insp
+                * (1 - EasyMath.PowCurve(Iroduki, 2f, Iroduki_Limit))
+                * EasyMath.PowCurve(Insp_Rate(), 0.5f, 1)
+                * 0.5f
+                * dTime;*/
+            // ためこみ値が溜まっていればその分色づきに吸収される
+            // ためこみ値がないとインスピが抑えられないことになる
+            //Insp_Loss *= ((Tamekomi - Iroduki) / Tamekomi_Limit);
+            //if (Insp_Loss > Insp) Insp_Loss = Insp;
+        }
+        if (uuu.TestCode == "Manjutane")
+        {
+            // がまん値は実質限界値100倍の量のインスピを溜め込める
+            // インスピを溜め込む割合は色づきによって決まる
+            //Insp_Loss = Insp * 0.010 * (1 - EasyMath.PowCurve(Gaman, 2.0f, Gaman_Limit));
+            //Gaman += Insp_Loss * 0.01 * (1 - EasyMath.PowCurve(Iroduki, 2.0f, Iroduki_Limit));
+            //Gaman *= 0.9999;
+        }
+
+        // インスピ吸収
+        // インスピ値を一時的に上位のインスピ値に吸収させる
+        // 最終的に色づき値が上がると逃げ場所が無くなり
+        //バクハツ発が避けられなくなる
+
+        double insp_a;
+        double loss;
+        double cutoff = 0;
+        float rate = 5 / 1.0f;
+        //float rate = dTime / 1.0f;
+        float dstpow = 5;
+
+        //IrodukiAbsorb(Absorb(Insp3, Iroduki, Iroduki_Limit, (1 / 5.0f), 2, ref cutoff));
+        //Insp3 -= Absorb(Insp3, Iroduki, Iroduki_Limit, (1 / 5.0f), 2, ref cutoff);
+
+        //rate = 10 / 1.0f;
+        //loss = Absorb_Cutoff(Insp2, Insp3, Iroduki_Limit, (1 / 1.0f), 2, ref cutoff);
+        //IrodukiAbsorb(loss);
+
+        // insp3の吸収処理
+        if (false)
+        {
+            loss = Absorb(Insp3, Iroduki, Iroduki_Limit, rate, dstpow);
+            IrodukiAbsorb(loss);
+            Insp3 -= loss;
+        }
+        //Insp3 += Absorb(cutoff, Insp3, Iroduki_Limit, (1 / 1.0f), 2);
+        //Insp2 -= Absorb(cutoff, Insp3, Iroduki_Limit, (1 / 1.0f), 2);
+
+        //IrodukiAbsorb(Insp_Loss(Insp2));
+        //Insp3 += Absorb(Insp2, Insp3, Iroduki_Limit, (1 / 3.0f), 2, ref cutoff);
+        //Insp2 -= Absorb(Insp2, Insp3, Iroduki_Limit, (1 / 3.0f), 2, ref cutoff);
+
+        // insp2の吸収処理
+        if (false)
+        {
+            insp_a = Insp2 - Insp3;
+            //rate = 10 / 1.0f;
+            loss = Absorb_Cutoff(insp_a, Iroduki, Iroduki_Limit, rate, dstpow, ref cutoff);
+            IrodukiAbsorb(loss);
+            Insp2 -= loss;
+            Insp3 += Absorb(cutoff, Insp3, Iroduki_Limit, rate, dstpow);
+            Insp2 -= Absorb(cutoff, Insp3, Iroduki_Limit, rate, dstpow);
+        }
+        //IrodukiAbsorb(Insp_Loss(Insp1));
+        //Insp2 += Absorb(Insp1, Insp2, Iroduki_Limit, (1 / 2.0f), 2, ref cutoff);
+        //Insp1 -= Absorb(Insp1, Insp2, Iroduki_Limit, (1 / 2.0f), 2, ref cutoff);
+
+        // insp1からの吸収処理
+        if (false)
+        {
+            insp_a = Insp1 - Insp2;
+            //rate = 10 / 1.0f;
+            loss = Absorb_Cutoff(insp_a, Iroduki, Iroduki_Limit, rate, dstpow, ref cutoff);
+            IrodukiAbsorb(loss);
+            Insp1 -= loss;
+            Insp2 += Absorb(cutoff, Insp2, Iroduki_Limit, rate, dstpow);
+            Insp1 -= Absorb(cutoff, Insp2, Iroduki_Limit, rate, dstpow);
+        }
+
+        // inspからの吸収処理
+        if (false)
+        {
+            // inspからinsp1に吸収する？
+            if (false)
+            {
+                insp_a = Insp - Insp1;
+                //rate = 10 / 1.0f;
+                loss = Absorb_Cutoff(insp_a, Iroduki, Iroduki_Limit, rate, dstpow, ref cutoff);
+                IrodukiAbsorb(loss);
+                Insp -= loss;
+                Insp1 += Absorb(cutoff, Insp1, Iroduki_Limit, rate, dstpow);
+                Insp -= Absorb(cutoff, Insp1, Iroduki_Limit, rate, dstpow);
+            }
+            // inspからinsp1に吸収せず
+            // そのまま色づきへ吸収させる
+            else
+            {
+                loss = Absorb(Insp, Iroduki, Iroduki_Limit, rate, dstpow);
+                IrodukiAbsorb(loss);
+                Insp -= loss;
+            }
+        }
+
+
+        /*IrodukiAbsorb(Insp_Loss(Insp3));
+        Insp3 -= Insp_Loss(Insp3);
+
+        //IrodukiAbsorb(Insp_Loss(Insp2));
+        Insp3 += Insp_Loss(Insp2);
+        Insp2 -= Insp_Loss(Insp2);
+
+        //IrodukiAbsorb(Insp_Loss(Insp1));
+        Insp2 += Insp_Loss(Insp1);
+        Insp1 -= Insp_Loss(Insp1);
+
+        //IrodukiAbsorb(Insp_Loss(Insp));
+        Insp1 += Insp_Loss(Insp);
+        Insp -= Insp_Loss(Insp);*/
+
+        // 仮処理
+        // insp3（チャンネル3）のみ使用
+
+
+
+        //if (Insp1_Rate > 1) Insp1_Rate = 1;
+        //Insp1 += UpInsp * Insp1_Rate;
+
+        //Insp -= Insp_Loss(Insp);
+
+        //Insp1 -= Insp_Loss(Insp1);
+        //Insp2 -= Insp_Loss(Insp2);
+
+        /*
+        double Insp3_Loss = Insp_Loss(Insp3, true);
+        Insp3 -= Insp3_Loss;
+        Insp += Insp3_Loss;
+
+        // インスピ0値の処理
+        // Insp_LossはdTime適用済
+        double Insp0_Loss = Insp_Loss(Insp);
+
+        // 90% - 180%
+        // 0.9で100%になる
+        float Insp3_Rate = (float)((Insp / Insp_Limit) - 0.9) * (1.0f / 0.9f);
+        if (Insp3_Rate < 0)
+        {
+           Insp3_Rate = 0;
+        }
+
+        Insp3 += Insp0_Loss * Insp3_Rate;
+        Insp -= Insp0_Loss * Insp3_Rate;        
+
+        // 色づき吸収
+        Insp -= Insp0_Loss;
+        IrodukiAbsorb(Insp0_Loss);*/
+
+        StatKeepInsp += (Insp / 20000) * dTime;                     // インスピレーション維持指数によってインスピ限界値がゆっくりインフレする
+                                                                    // Iroduki -= dMixSukkiri * 0.02f * (mipr);
+
+        // 吸い上げる値が枯渇したら普通に増える
+        /*if (Iroduki < 0)
+        {
+            Insp += -Iroduki;
+            Iroduki = 0;
+        }*/
+    }
+    void UpdateInspLimit()
+    {
+        // b50
+        // 暫定処理
+        Insp_Limit_Base2 = Gaman;
+        //Insp_Limit_Base2 = Iroduki_Limit / Iroduki_Capacity;
+        //Insp_Limit_Base2 = 1.0f;
+        //Insp_Limit_Base2 = Insp_Limit_Base + (float)(StatSukkiri / 10) / 2;
+        // インスピ限界をたまらん値で引くということは
+        // 結局のところインスピ値にたまらん値を足すのと同じことになる
+        // そうなるとインスピ値にたまらん値を足すことで
+        // バクハツ制御に使うようにした方が良いか？
+        // × Insp_Limit = Insp_Limit_Base2 - Tamaran;
+        // 〇 Insp_Limit = Insp_Limit_Base2;
+        Insp_Limit = Insp_Limit_Base2;
+    }
+
+    // フレーバー参照用メソッド
+    // Fl(n)というフォーマットのみでフレーバーを参照出来る
+    public Flavor Fl(int n)
+    {
+        return un.Fl.list[n];
+    }
+
+    void UpdateFlavor()
+    {
+        if (un.Fl == null)
+        {
+            un.Fl_List_Construct();
+        }
+
+        // フレーバーで色気づく
+        if (un.Fl.Count() != 0)
+        {
+            Irk += Fl(0).Absorb(Fl(0) * 0.01f * dTime);
+            // クールダウン0.01%（3時間くらいかかる）
+            // そうでなくても長ければ長いほど機能が回復する
+            Fl(0).value += (Fl(0).max - Fl(0).value) * 0.0001f * dTime;
+        }
+
+        // フレーバークールダウン
+        Fl_Mix_Max = MixStrength * 100;
+
+        //Fl_Mix_Irk -= Fl_Mix_Irk * 0.01f * dTime;
+
+        // 1%の消費に対してクールダウンはさらに1%(0.01%)
+        Fl_Mix += (Fl_Mix_Max - Fl_Mix) * 0.0001f * dTime;
+
+        if (Fl_Mix < 0) Fl_Mix = 0;
+        if (Fl_Mix > Fl_Mix_Max) Fl_Mix = Fl_Mix_Max;
+    }
+
+    void UpdateMix()
+    {
+        double a = 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+        double b = MixStrength * 0.5f;
+        double bi = MixStrength * 0.5f;                   // 色気づきの影響を受けたミクスチャ強度 
+
+        // 押し下げ値(c-down値)
+        // プリミクスチャ値は0.2秒で補充される(c-up値)
+        // 注意：Pre_Mixは0-1の値
+        double cdn = Pre_Mix * a;                         // プリミクスチャ消費量
+        double cup = (1 - Pre_Mix) * 5.0f * dTime;        // プリミクスチャ補充量
+
+        // ミクスチャを押し付けた状態でミクスチャが増加
+        if (un.mix_state == 1)
+        {
+            Mix_State = true;
+            // すっきり値が適用された単位時間当たりの増加量
+
+            // 色気づき増加
+            // 1回の押し付けでミックスフレーバー値の1%、色気づきが増加する
+            // ※Pre_Mixの値はPre_Mixと違い、ミクスチャ強度の適用されていない0-1の範囲の値となる
+
+            // フレーバー値から色気づきに変換
+            // インスピ量に応じて補正が0.5から1.5の範囲でかかる
+            //Fl_Mix_Irk += Pre_Mix * (Fl_Mix - Fl_Mix_Irk) * 0.01f * a;
+            dIrk += cdn * 0.5f * Fl_Mix * 0.01f;
+            //dIrk += Pre_Mix * 0.5f * Fl_Mix
+            //* (Insp_Rate(Insp) + 0.5f)
+            //    * 0.01f * a;
+            //Fl_Mix_Irk_Insp = Fl_Mix_Irk + Insp;    // 補正
+
+            // この辺が少し問題
+            // フレーバー値のうち、色気づき値に割り当てられた分は
+            // フレーバー値から消費されない
+            // 代わりにフレーバー値を消費したうち
+            // 割り当てたフレーバー値と、フレーバー値本体の両方から引かなければならない
+            //Fl_Mix_Irk -= Pre_Mix * Fl_Mix_Irk_Insp * 0.01f * a;
+            //Fl_Mix -= Pre_Mix * Irk_Insp * 0.01f * a;
+            Fl_Mix -= cdn * 0.5f * Fl_Mix * 0.01f;
+            //Fl_Mix -= Pre_Mix * 0.5f * Fl_Mix
+            //* (Insp_Rate(Insp) + 0.5f)
+            //    * 0.01f * a;
+            // 補正を受けるが、消費する値も大きくなる
+
+            // 色気づき値からミクスチャ値に変換
+            // 補正が1.5から0.5の範囲でかかる
+            // 前半は供給が遅く、消費が速い
+            // 後半は供給が速く、消費が遅い
+            //Mix += Pre_Mix * Irk
+            //    * (1 - Iroduki_Rate() + 0.5f)
+            //    * 0.01f * a;
+            //Irk -= Pre_Mix * Irk
+            //    * (1 - Iroduki_Rate() + 0.5f)
+            //    * 0.01f * a;
+
+            // 色気づきが少ない時
+            if (Irk < 0)
+            {
+                // 現在色気づきによる減衰は停止中
+                // bi = (MixStrength * 0.5f) + (Irk * 0.01f);
+            }
+
+            // ミックス
+            Mix += cdn * b;
+            // Mix += cdn * (MixStrength * 0.5f);
+
+            // ミックスによる色気づきボーナス
+            // Mix += cdn * bi;
+            // Irk -= cdn * bi;
+
+            Pre_Mix -= cdn;
+
+            // 押し付けるとプリミクスチャからポンプのようにミクスチャ値に値が送り込まれる
+            // （0.2秒で100%のペース）
+
+            //Mix += Pre_Mix * 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+            //Pre_Mix -= Pre_Mix * 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+        }
+        // ミクスチャ値からデルタミクスチャに変換して消費する（0.2秒で変換）
+        // 完成に近づくほど、刺激が弱くなる（旧ソースの仕様）
+        // dMix += Mix * 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+        // Mix -= Mix * 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+        dMix += Mix * 5.0f * dTime;
+        Mix -= Mix * 5.0f * dTime;
+
+        // プリミクスチャ値からミクスチャ値を消費する
+        // この値はすっきり値の影響を受けないため、すっきり中は消費が無駄になる
+        //Pre_Mix -= Mix * 2.0f * dTime * Mathf.Pow(1 - Sukkiri_Rate(), 5);
+
+        // Pre_Mix_Bonus += dPre_Mix_Bonus * 5.0f * dTime;
+        // dPre_Mix_Bonus += dPre_Mix_Bonus * 5.0f * dTime;
+        // Pre_Mix_Bonus -= Pre_Mix_Bonus * 5.0f * dTime;
+        //}
+
+        // ミクスチャを離した状態でプリミクスチャが補充される
+        if (un.mix_state == 0)
+        {
+            // 色気づきが少ない時
+            if (Irk < 0)
+            {
+                // 現在色気づきによる減衰は停止中
+                // bi = (MixStrength * 0.5f) + (Irk * 0.01f);
+            }
+            if (Mix_State)
+            {
+                // インスピ上昇ポップ表示後、計測値をリセット
+                //double d = (1 - Pre_Mix) * (b + bi);
+                double d = (1 - Pre_Mix) * (b + 0f);
+                // d : こすり上げで上がるインスピの予測値
+                if (dUpInspPop + d >= 0)
+                {
+                    ui.UpInspPop(dUpInspPop + d);
+                    dUpInspPop = -d;
+                }
+                else
+                {
+                    // 予測値が消費される前に次のミックスをすると次の表示がマイナスになる
+                    // その時はマイナス値を持ち越し（いつかは消費される）
+                    ui.UpInspPop(0);
+                    dUpInspPop = -d - (dUpInspPop + d);
+                }
+
+            }
+            Mix_State = false;
+
+            if (true)
+            {
+                dIrk += cup * 0.5f * Fl_Mix * 0.01f;
+                Fl_Mix -= cup * 0.5f * Fl_Mix * 0.01f;
+
+                // ミックス（こすり上げ）
+                Pre_Mix_Bonus += cup * b;
+                //Pre_Mix_Bonus += cup * (MixStrength * 0.5f);
+
+                // ミックスによる色気づきボーナス
+                // Pre_Mix_Bonus += cup * bi;
+                // Irk -= cup * bi;
+
+                Pre_Mix += cup;
+            }
+
+            // プリミックス値は0.2秒で補充される
+            if (Pre_Mix < 0) Pre_Mix = 0;
+            if (Pre_Mix < 1)
+            {
+                //Pre_Mix += (1 - Pre_Mix) * 5.0f * dTime;
+                // こすり上げボーナスにより、補充分の100%がミクスチャ値に変換される
+                //Mix += 1.0f * (MixStrength - Pre_Mix) * 5.0 * dTime;
+                // ミクスチャポップに反映させるための値（白い枠が少し膨らむ）
+                //dPre_Mix_Bonus += 1.0f * (MixStrength - Pre_Mix) * 5.0 * dTime;
+
+            } else
+            {
+                Pre_Mix = 1;
+            }
+
+            // プリミクスチャ値は0.2秒で補充される
+            // 注意：Pre_Mixは0-1の値
+            if (Pre_Mix < 1)
+            {
+                //Pre_Mix += (1 - Pre_Mix) * 5.0f * dTime;
+                // こすり上げボーナスにより、補充分の100%がミクスチャ値に変換される
+                //Mix += 1.0f * (MixStrength - Pre_Mix) * 5.0 * dTime;
+                // ミクスチャポップに反映させるための値（白い枠が少し膨らむ）
+                //dPre_Mix_Bonus += 1.0f * (MixStrength - Pre_Mix) * 5.0 * dTime;
+
+            }
+            // プリミクスチャボーナス
+            //Pre_Mix += Pre_Mix_Bonus * 2.0 * dTime;
+            //Pre_Mix_Bonus -= Pre_Mix_Bonus * 2.0 * dTime;
+            //Pre_Mix_Bonus += dPre_Mix_Bonus * 2.0 * dTime;
+            //dPre_Mix_Bonus -= dPre_Mix_Bonus * 2.0 * dTime;
+            //Pre_Mix_Bonus -= Pre_Mix_Bonus * 1.0 * dTime;
+        } else
+        {
+            // 押し付けたままでもちょこっと補充される
+            // 定数が5.0fではなく、0.5fとなっている（0.2秒ではなく、0.02秒ペース）
+            if (Pre_Mix < 0) Pre_Mix = 0;
+            if (Pre_Mix < 1)
+            {
+                Pre_Mix += (1 - Pre_Mix) * 0.5f * dTime;
+                // こすり上げボーナスにより、補充分の100%がミクスチャ値に変換される
+                //Mix += 1.0f * (MixStrength - Pre_Mix) * 5.0 * dTime;
+                // ミクスチャポップに反映させるための値（白い枠が少し膨らむ）
+                //dPre_Mix_Bonus += 1.0f * (MixStrength - Pre_Mix) * 5.0 * dTime;
+
+            }
+            else
+            {
+                Pre_Mix = 1;
+            }
+
+            // 押し付けたままでもちょこっと補充される
+            Pre_Mix += (1 - Pre_Mix) * 0.5f * dTime;
+
+            // 押し付けたままでも10%まで補充される
+            //if (Pre_Mix < (MixStrength * 0.1f))
+            //{
+            //    Pre_Mix += ((MixStrength * 0.1f) - Pre_Mix) * 5.0 * dTime;
+            //}
+        }
+
+        //if (Union.mix_state == 0)
+        if (false)
+        {
+            dIrk += (1 - Pre_Mix) * 0.5 * Fl_Mix
+                * 0.01f;
+
+            Fl_Mix -= (1 - Pre_Mix) * 0.5 * Fl_Mix
+                * 0.01f;
+
+            Mix += MixStrength * 0.5 * (1 - Pre_Mix);
+            dIrk -= MixStrength * 0.5 * (1 - Pre_Mix); // 色気づき消費
+            dPre_Mix_Bonus += (1 - Pre_Mix) * 0.5;
+            //Mix += (MixStrength - Pre_Mix) * 0.5;
+            //dPre_Mix_Bonus += (MixStrength - Pre_Mix) * 0.5;
+        }
+
+        // プリミックスボーナス
+        //Pre_Mix_Bonus += dPre_Mix_Bonus * 1.0f * dTime;
+        //dPre_Mix_Bonus -= dPre_Mix_Bonus * 1.0f * dTime;
+        //Pre_Mix_Bonus += dPre_Mix_Bonus * 5.0f * dTime;
+        //dPre_Mix_Bonus -= dPre_Mix_Bonus * 5.0f * dTime;
+        //Pre_Mix_Bonus -= Pre_Mix_Bonus * 5.0f * dTime;
+
+        // プリミックスボーナスの消費
+        dPre_Mix_Bonus = Pre_Mix_Bonus * 5.0f * dTime;
+        dMix += dPre_Mix_Bonus;
+        Pre_Mix_Bonus -= dPre_Mix_Bonus;
+
+        // ddMixで実際の消費が行われる（秒間100%）
+        ddMix = dMix * 5.0f * dTime;
+
+        // すっきりしているとミクスチャ値のロスが発生する
+        // 少しでもすっきりしてるとミクスチャがかなり弱くなる
+        //ddMixSukkiri = ddMix * Mathf.Pow(1 - Sukkiri_Rate(), 5);
+        ddMixSukkiri = ddMix;
+
+        //Mix -= ddMix;
+        //dMix -= ddMix;
+
+        Mix -= ddMix;
+        dMix -= ddMix;
+        dMix -= 0;
+
+        dUpInspPop += ddMix;                                // インスピ上昇テキスト生成用計測値（生成時0にリセットされる）
+
+        if (ddMix < 0) ddMix = 0;
+        if (dMix < 0) dMix = 0;
+        if (Mix < 0) Mix = 0;
+        StatMix += dMix * dTime;                            // 総ミクスチャ量（すっきりに依存しない、とにかくこすれ！）
+
+        // dMixの最低値を計算
+        // ミックスに慣れて、この最低値である程度無効化する
+        // しかしその分ミックス強度に応じて倍率が上がる
+        // ミックスをしないと一瞬で最低値が戻る
+        if (dMix < dMix_Min) dMix_Min -= (dMix_Min - dMix) * 5.0 * dTime;
+        if (dMix > dMix_Min) dMix_Min -= (dMix_Min - dMix) * 0.5 * dTime;
+
+        // 以下ミックスポップ更新処理から移動
+        // 正しく解読出来てない
+        if (true)
+        {
+            // プリミックス最大値を元に戻す？
+            if (Pre_Mix > Pre_Mix_Max) Pre_Mix_Max -= (Pre_Mix_Max - Pre_Mix) * 5.0 * dTime;
+            if (Pre_Mix < Pre_Mix_Max) Pre_Mix_Max -= (Pre_Mix_Max - Pre_Mix) * 1.0 * dTime;
+
+            // プリミックスボーナス最大値を元に戻す？
+            double Pre_BMix = Pre_Mix + Pre_Mix_Bonus;
+
+            if (Pre_BMix > Pre_BMix_Max) Pre_BMix_Max -= (Pre_BMix_Max - Pre_BMix) * 5.0 * dTime;
+            if (Pre_BMix < Pre_BMix_Max) Pre_BMix_Max -= (Pre_BMix_Max - Pre_BMix) * 1.0 * dTime;
+        }
+    }
+
+    void UpdateMix_b48()
+    {
+        // ミクスチャを押し付けた状態でミクスチャが増加
+        if (un.mix_state == 1)
+        {
+            // 押し付けるとプリミクスチャからポンプのようにミクスチャ値に値が送り込まれる
+            // （0.2秒で100%のペース）
+            Mix += Pre_Mix * 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+            Pre_Mix -= Pre_Mix * 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+        }
+        // ミクスチャ値からデルタミクスチャに変換して消費する（0.2秒で変換）
+        // 完成に近づくほど、刺激が弱くなる（旧ソースの仕様）
+        dMix += Mix * 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+        Mix -= Mix * 5.0f * dTime * Mathf.Pow(Sukkiri_Invalid_Rate_B(1, 1), 5);
+
+        // プリミクスチャ値からミクスチャ値を消費する
+        // この値はすっきり値の影響を受けないため、すっきり中は消費が無駄になる
+        //Pre_Mix -= Mix * 2.0f * dTime * Mathf.Pow(1 - Sukkiri_Rate(), 5);
+
+        // Pre_Mix_Bonus += dPre_Mix_Bonus * 5.0f * dTime;
+        // dPre_Mix_Bonus += dPre_Mix_Bonus * 5.0f * dTime;
+        // Pre_Mix_Bonus -= Pre_Mix_Bonus * 5.0f * dTime;
+        //}
+
+        // ミクスチャを離した状態でプリミクスチャが補充される
+        if (un.mix_state == 0)
+        {
+            // プリミクスチャ値は0.2秒で補充される
+            if (Pre_Mix < MixStrength)
+            {
+                Pre_Mix += (MixStrength - Pre_Mix) * 5.0 * dTime;
+                // こすり上げボーナスにより、補充分の100%がミクスチャ値に変換される
+                //Mix += 1.0f * (MixStrength - Pre_Mix) * 5.0 * dTime;
+                // ミクスチャポップに反映させるための値（白い枠が少し膨らむ）
+                //dPre_Mix_Bonus += 1.0f * (MixStrength - Pre_Mix) * 5.0 * dTime;
+
+            }
+            // プリミクスチャボーナス
+            //Pre_Mix += Pre_Mix_Bonus * 2.0 * dTime;
+            //Pre_Mix_Bonus -= Pre_Mix_Bonus * 2.0 * dTime;
+            //Pre_Mix_Bonus += dPre_Mix_Bonus * 2.0 * dTime;
+            //dPre_Mix_Bonus -= dPre_Mix_Bonus * 2.0 * dTime;
+            //Pre_Mix_Bonus -= Pre_Mix_Bonus * 1.0 * dTime;
+        }
+        else
+        {
+            // 押し付けたままでもちょこっと補充される
+            Pre_Mix += (MixStrength - Pre_Mix) * 0.5 * dTime;
+
+            // 押し付けたままでも10%まで補充される
+            //if (Pre_Mix < (MixStrength * 0.1f))
+            //{
+            //    Pre_Mix += ((MixStrength * 0.1f) - Pre_Mix) * 5.0 * dTime;
+            //}
+        }
+
+        // プリミクスチャボーナス
+        Pre_Mix_Bonus += dPre_Mix_Bonus * 5.0f * dTime;
+        dPre_Mix_Bonus -= dPre_Mix_Bonus * 5.0f * dTime;
+        Pre_Mix_Bonus -= Pre_Mix_Bonus * 5.0f * dTime;
+
+        // ddMixで実際の消費が行われる（秒間100%）
+        ddMix = dMix * 1.0f * dTime;
+
+
+        // すっきりしているとミクスチャ値のロスが発生する
+        // 少しでもすっきりしてるとミクスチャがかなり弱くなる
+        //ddMixSukkiri = ddMix * Mathf.Pow(1 - Sukkiri_Rate(), 5);
+        ddMixSukkiri = ddMix;
+
+        //Mix -= ddMix;
+        //dMix -= ddMix;
+
+        Mix -= ddMix;
+        dMix -= ddMix;
+        dMix -= 0;
+
+
+        if (ddMix < 0) ddMix = 0;
+        if (dMix < 0) dMix = 0;
+        if (Mix < 0) Mix = 0;
+        StatMix += dMix * dTime;                            // 総ミクスチャ量（すっきりに依存しない、とにかくこすれ！）
+    }
+
+    void UpdateMixStrength()
+    {
+        // ミクスチャ強度は最終的に色づき吸収率で変化させることも考えてる
+        if (StatMix > 0)
+        {
+            MixStrength = 0.01
+             +
+                (
+                    Mathf.Pow((float)StatMix / 1000, 0.5f) +            // 総ミクスチャ量に基づいてインスピ許容値がインフレ
+                    (Iroduki_IncreaseLimit / 100)                       // フレーバーの１％だけミクスチャが強化される
+                ) * 0.01;                                               // それを1%
+        }
+        // マイナス用の処理も（イレギュラー用の処理）
+        else
+        {
+            MixStrength = 0.01
+            -
+               Mathf.Pow((float)-StatMix / 1000, 0.5f) +          // 総ミクスチャ量に基づいてインスピ許容値がインフレ
+               (Iroduki_IncreaseLimit / 100);                        // フレーバーの１％だけミクスチャが強化される
+        }
+
+        // ムードで2倍化
+        MixStrength *= (1 + uuu.Mood);
+    }
+
+    // 色気付き更新処理
+    void UpdateIrk()
+    {
+        // デルタ色気づきから、色気づき本体へ移動
+        Irk += dIrk * 1.0f * dTime;
+        dIrk -= dIrk * 1.0f * dTime;
+
+        // 色気づき減衰
+        // インスピが溜まれば溜まるほど減衰しない
+        //Irk -= Irk * 0.01f * (1 - Insp_Rate(Insp)) * dTime;
+
+        // インスピ補正
+        Irk_Insp = Irk + (Irk * Insp_Rate(Tamaran)) + (Komiage);
+        //Irk_Insp = Irk + (Irk * Insp_Rate(Tamaran)) + (Tamaran * Insp) + (Komiage);
+        //Irk_Insp = Irk + (Irk * Insp_Rate(Tamaran)) + (Tamaran * Iroduki * 100) + (Komiage * 100);
+        // かなり複雑になった
+        // インスピで補正がかかるが、そこにさらに溜め込み補正もかかる
+
+        // Irk_Insp = ((Irk_Insp + (Insp_Limit * 100)) * Mathf.Pow(Sukkiri_Invalid_Rate_C(1, 1), 5)) - (Insp_Limit * 100);
+        // インスピ補正をかけた値ですっきり補正をかける
+        // すっきりしてるのに無駄にこすらない
+        // またすっきりしてもこみ上げてる間はこすり続ける
+        // インスピ上限を足して割った後、また引く（すっきりでマイナスに近づける）
+
+        //Union.SetIrk(1);
+        if (Irk_Insp + InspVolume() > Gaman)
+        {
+            // Union.SetIrk(1);
+            // Union.irk_automix_time = (float)(4.8f / (1 + (Irk_Insp / ((Gaman * 10) / 9)))) + 0.2f;
+            // Irk_inspが
+            // Gaman * 10に到達した場合に自動インスピ感覚が0.5f（分母が10になる）
+        } else
+        {
+            if (Irk_Insp + InspVolume() < (Gaman * 0.5f))
+            {
+                //Union.SetIrk(0);
+            }
+        }
+        un.irk_automix_time = (float)(4.8f / (1 + (Irk_Insp / ((Gaman * 10) / 9)))) + 0.2f;
+    }
+
+    void UpdateIroduki()
+    {
+        // IrodukiAbsorbに移動
+        // 実質何も処理しない
+
+        // 色づきがインスピを1%ずつ吸収
+        // ミクスチャをし続けていれば最終的にはバクハツする
+        /*double IrodukiAbsorbInsp =
+            Insp_Loss(Insp) * (1.0f / Iroduki_Capacity);                           // 色づきの許容量に応じて吸収割合を変化させる（100倍なら1%）
+            //* ((Tamekomi - Iroduki) / Tamekomi_Limit);
+            // * (Tamekomi / Tamekomi_Limit);
+            // ためこみ値が溜まっている分だけ色づくが
+            // ため込み値が足りない分は色づきにも吸収されずロスになる
+        Iroduki += IrodukiAbsorbInsp;
+        StatIrodukiAbsorbInsp += IrodukiAbsorbInsp;      // インスピ吸収量*/
+
+        /*Iroduki_Loss =
+            // インスピが溜まった場合、ためこみが足りないと低下する
+            EasyMath.PowCurve(Insp_Rate(Insp), 0.2f, 1) * (1 - Tamekomi_Rate())
+            * 0.01
+            * Iroduki_Limit
+            * dTime;
+        if (Iroduki_Loss > Iroduki) Iroduki_Loss = Iroduki;*/
+
+        // Iroduki -= Iroduki_Loss;
+        // 今色づきロスは実装していない
+    }
+
+    public float Iroduki_Rate()
+    {
+        return (float)(Iroduki / Iroduki_Limit);
+    }
+
+    // 色づき吸収
+    void IrodukiAbsorb(double value)
+    {
+        // 色づきがインスピを1%ずつ吸収
+        // ミクスチャをし続けていれば最終的にはバクハツする
+        double IrodukiAbsorbInsp =
+            //value * (1.0f / Iroduki_Capacity);                           // 色づきの許容量に応じて吸収割合を変化させる（100倍なら1%）
+            value;                                                         // b50からインスピ値が全部のチャンネルにおいて等価になった
+                                                                           //* ((Tamekomi - Iroduki) / Tamekomi_Limit);
+                                                                           // * (Tamekomi / Tamekomi_Limit);
+                                                                           // ためこみ値が溜まっている分だけ色づくが
+                                                                           // ため込み値が足りない分は色づきにも吸収されずロスになる
+        Iroduki += IrodukiAbsorbInsp;
+
+        // 子ポップを湧かせる
+        // 子ポップを湧かせるエネルギーを蓄積させる
+        Iroduki_Absorbing += IrodukiAbsorbInsp;
+        // 一定時間経つか、0.1溜まったら新ポップを生成する
+        while (false)
+        {
+            // 湧かせる
+            _Iroduki_ChildPop NewChildPop = new();
+            NewChildPop.obj = Instantiate(ICPop_0_1, new Vector3(0, 0, 0), Quaternion.identity, ui.ip.InspPopMaster.transform);
+            NewChildPop.time = 5.0f;
+            NewChildPop.posx = 0;
+            NewChildPop.posy = 0;
+            Random.InitState((int)System.DateTime.Now.Ticks);
+            NewChildPop.posgx = Random.value * 3.0f - 1.5f;
+            NewChildPop.posgy = Random.value * 3.0f - 1.5f;
+            NewChildPop.obj.SetActive(true);
+            //NewChildPop.obj.
+
+            Iroduki_ChildPop.Add(NewChildPop);
+            Iroduki_nChildPop++;
+
+            /*GameObject NewProdPop;
+            NewProdPop = Instantiate(ProdPopOrg, new Vector3(0, 0, 0), Quaternion.identity);
+            NewProdPop.GetComponent<ProdPop>().Product = Producable();
+            NewProdPop.GetComponent<ProdPop>().Sukkiri = a;
+            NewProdPop.GetComponent<ProdPop>().Uni_Mxt = this;
+            NewProdPop.GetComponent<ProdPop>().times = 1;               // 応急処置：timesが０だと表示時間なしと見なされて消去される？
+            ProdPops.Add(NewProdPop);
+
+            NewProduct = Instantiate(Prod_Syrup_Org, new Vector3(0, 0, 0), Quaternion.identity);
+            NewProduct.GetComponent<Product>().Grade = (int)(b / 1);        // シロップの生産量は1の倍数
+            }
+            NewProduct.SetActive(false);
+            NewProduct.GetComponent<Product>().Union = Union;
+            NewProduct.GetComponent<Product>().Born_Pos = Union.transform.Find("Anim/Shadow_Pos").gameObject.transform.position.y;
+            ProductFlavors.Add(NewProduct);
+            Birth(b);*/
+
+            //Iroduki_ChildPop.Add = new GameObject;
+
+            Iroduki_Absorbing -= 0.1f;
+        }
+
+        StatIrodukiAbsorbInsp += IrodukiAbsorbInsp;      // インスピ吸収量
+    }
+
+    // 色づき更新（Kurimanju旧バージョン）
+    void UpdateIroduki_Kurimanju()
+    {
+        double flInc = 0;               // 増加量
+        double flLim = 0;               // 増加上限
+        double flLimFinal = 0;          // 色づき上限を適用した最終的な値
+
+        // フレーバー(色っぽい雰囲気) = 20
+        double flIncDefault = 0.01f
+            * KomiageCr()
+            * (Sukkiri_Invalid_Rate_B(1, 1));
+        flLim += 20;
+        if (flLim > Iroduki_Limit) flLimFinal = Iroduki_Limit; else flLimFinal = flLim;
+        if (flLimFinal > Iroduki)
+        {
+            Iroduki += flIncDefault * (1 - Iroduki / flLimFinal);
+        }
+        // フレーバー(ミクスチャ) = 50
+        double flIncMix = EasyMath.ConvTo(Mix, 0.05f, 2.0f)
+            * KomiageCr()                                        // 少しでもこみ上げたら色づかない
+            * (Sukkiri_Invalid_Rate_B(1, 1));                                 // すっきりしたら色づかない
+        flLim += 50;
+        if (flLim > Iroduki_Limit) flLimFinal = Iroduki_Limit; else flLimFinal = flLim;
+        if (flLimFinal > Iroduki)
+        {
+            Iroduki += flIncMix * (1 - Iroduki / flLimFinal);
+        }
+        // フレーバー（ミクスチャ完成／こみあげ）= 100(初期)
+        double flIncCompletion = Komiage * 0.001f
+            * (Sukkiri_Invalid_Rate_B(1, 1));                           // すっきりしたら色づかない
+                                                                        // こみあげてもすっきりするまで色づき続ける
+                                                                        //flLim += Komiage;
+        flLim += 100;
+        if (flLim > Iroduki_Limit) flLimFinal = Iroduki_Limit; else flLimFinal = flLim;
+        if (flLimFinal > Iroduki)
+        {
+            Iroduki += flIncCompletion * (1 - Iroduki / flLimFinal);
+        }
+        // フレーバー（生産物）
+        double flIncProd = 0;
+        double flLimProd = 0;
+        int ElmKCount = 0;
+        int ElmKGradeSum = 0;
+        int MotiCount = 0;
+        int MotiGradeSum = 0;
+        int WhipCount = 0;
+        int WhipGradeSum = 0;
+        int SyrupCount = 0;
+        int SyrupGradeSum = 0;
+        for (int i = 0; i < 50; i++)
+        {
+            // エレメント
+            if (i > 30)
+            {
+                ElmKCount += un.ProductItems[i];
+                ElmKGradeSum += un.ProductItems[i] * (i - 30);             // グレード加算
+            }
+            if (i > 20)
+            {
+                MotiCount += un.ProductItems[i];
+                MotiGradeSum += un.ProductItems[i] * (i - 20);             // グレード加算 - 29なら9
+            }
+            else if (i > 10)
+            {
+                WhipCount += un.ProductItems[i];
+                WhipGradeSum += un.ProductItems[i] * (i - 10);             // グレード加算 - 19なら9
+            }
+            else
+            {
+                SyrupCount += un.ProductItems[i];
+                SyrupGradeSum += un.ProductItems[i] * (i - 0);             // グレード加算 - 9なら9
+            }
+        }
+        // 生産物の色づき量について
+        // 位置づけ的にはクッキークリッカーの施設のようなものになっているが
+        // 同作と比べて種類毎の生産量が格段に多いので
+        // 効果量が小さく、その分頭打ちになる量も大き目に設定している
+        // （対数関数の底がかなり小さくなっている／およそ１０分の１）
+        /*if (ElmKCount > 0)
+        {
+            flIncProd += Mathf.Log(1 + ElmKCount * 0.01f, 1.01f) * ((float)ElmKGradeSum / (float)ElmKCount) * 1000 * 0.001f;     // モチ
+            flLimProd += Mathf.Log(1 + ElmKCount * 0.01f, 1.01f) * ((float)ElmKGradeSum / (float)ElmKCount) * 1000;              // モチ
+        }
+        if (MotiCount > 0)
+        {
+            flIncProd += Mathf.Log(1 + MotiCount * 0.01f, 1.01f) * ((float)MotiGradeSum / (float)MotiCount) * 100 * 0.001f;     // モチ
+            flLimProd += Mathf.Log(1 + MotiCount * 0.01f, 1.01f) * ((float)MotiGradeSum / (float)MotiCount) * 100;              // モチ
+        }
+        if (WhipCount > 0)
+        {
+            flIncProd += Mathf.Log(1 + WhipCount * 0.01f, 1.01f) * ((float)WhipGradeSum / (float)WhipCount) * 10 * 0.001f;      // ホイップ
+            flLimProd += Mathf.Log(1 + WhipCount * 0.01f, 1.01f) * ((float)WhipGradeSum / (float)WhipCount) * 10;               // ホイップ
+        }
+        if (SyrupCount > 0)
+        {
+            flIncProd += Mathf.Log(1 + SyrupCount * 0.01f, 1.01f) * ((float)SyrupGradeSum / (float)SyrupCount) * 1f * 0.001f;      // シロップ
+            flLimProd += Mathf.Log(1 + SyrupCount * 0.01f, 1.01f) * ((float)SyrupGradeSum / (float)SyrupCount) * 1f;               // シロップ
+        }*/
+        if (ElmKCount > 0)
+        {
+            flIncProd += Mathf.Log(1 + ElmKCount * 0.001f, 1.001f) * ((float)ElmKGradeSum / (float)ElmKCount) * 100 * 0.001f;     // モチ
+            flLimProd += Mathf.Log(1 + ElmKCount * 0.001f, 1.001f) * ((float)ElmKGradeSum / (float)ElmKCount) * 100;              // モチ
+        }
+        if (MotiCount > 0)
+        {
+            flIncProd += Mathf.Log(1 + MotiCount * 0.001f, 1.001f) * ((float)MotiGradeSum / (float)MotiCount) * 10 * 0.001f;     // モチ
+            flLimProd += Mathf.Log(1 + MotiCount * 0.001f, 1.001f) * ((float)MotiGradeSum / (float)MotiCount) * 10;              // モチ
+        }
+        if (WhipCount > 0)
+        {
+            flIncProd += Mathf.Log(1 + WhipCount * 0.001f, 1.001f) * ((float)WhipGradeSum / (float)WhipCount) * 1 * 0.001f;      // ホイップ
+            flLimProd += Mathf.Log(1 + WhipCount * 0.001f, 1.001f) * ((float)WhipGradeSum / (float)WhipCount) * 1;               // ホイップ
+        }
+        if (SyrupCount > 0)
+        {
+            flIncProd += Mathf.Log(1 + SyrupCount * 0.001f, 1.001f) * ((float)SyrupGradeSum / (float)SyrupCount) * 0.1f * 0.001f;      // シロップ
+            flLimProd += Mathf.Log(1 + SyrupCount * 0.001f, 1.001f) * ((float)SyrupGradeSum / (float)SyrupCount) * 0.1f;               // シロップ
+        }
+        flIncProd *=
+            KomiageCr()                          // 少しでもこみ上げたら色づかない
+            * (Sukkiri_Invalid_Rate_B(1, 1));       // すっきりしたら色づかない
+        flLim += flLimProd;
+        if (flLim > Iroduki_Limit) flLimFinal = Iroduki_Limit; else flLimFinal = flLim;
+        if (flLimFinal > Iroduki)
+        {
+            if (uuu.TestCode == "Kurimanju")
+            {
+                Iroduki += flIncProd * (1 - Iroduki / flLimFinal);
+            }
+        }
+
+        dbgflIncProd = flIncProd;
+        dbgflLimProd = flLimProd;
+
+        Iroduki_IncreaseLimit = flLim;
+
+        if (uuu.TestCode == "Kurimanju")
+        {
+            Iroduki += Insp_Loss(Insp) * 0.01;
+        }
+        // ミクスチャをし続けていれば最終的にはバクハツする
+
+        if (uuu.TestCode == "Manjutane")
+        {
+            //Iroduki += 1 + dTime;
+            // 「警告」の秒間１秒増加
+        }
+
+        //StatIrodukiAbsorbInsp += Insp_Loss * 0.01;      // インスピ吸収量
+    }
+
+    // 色づき限界値
+    // 現在暫定的にためこみ限界値を流用中
+    void UpdateIrodukiLimit()
+    {
+        // 結果的にフレーバーが引き金になった生産物によって色づき限界が上がる
+        //Iroduki_Limit_Base = Tamekomi_Limit_Base;
+        Iroduki_Limit = Gaman_Limit;
+        //Iroduki_Limit = Tamekomi_Limit;
+    }
+
+    // 色づき限界値（Kurimanjuの旧版）
+    void UpdateIrodukiLimit_Kurimanju()
+    {
+        //Iroduki_Limit_Base = 50 + Mathf.Pow((float)Product / 100, 0.5f) * 100;          // 総生産量に基づいてインスピ許容値がインフレ
+
+        // 総生産量に基づいてインスピ許容値がインフレ
+        // だけど、インスピを吸収して強引に色づきを上げた場合、色づき限界は上がらない
+        // 結果的にフレーバーが引き金になった生産物によって色づき限界が上がる
+        Iroduki_Limit_Base = 1 + (float)(Product / 10);
+        //Iroduki_Limit_Base = 10 + (float)((Product - StatIrodukiAbsorbInsp) / 10) * 2;    
+        Iroduki_Limit = Iroduki_Limit_Base;
+    }
+    void UpdateGaman()
+    {
+        double Gaman_Left = Gaman_Limit - Gaman;        // 残りがまん量
+        double Gaman_Left_Rate = (Gaman_Limit - Gaman) / Gaman_Limit;       // その割合
+        double Gaman_Rate_a = (Gaman - Insp) / Gaman;   // インスピ値のがまん値に対する割合
+
+        // がまん質量
+        // 初期は10%、がまん値が上がる度に体積が増える
+        // 
+        //double Gaman_Volume = 0.1 * (0.1f / Gaman);                   // がまん質量はメソッド化
+        double Insp1_Volume = Insp1p();                                 // インスピステージ１の質量（インスピ2値を取り除いたもの）
+        double Insp2_Volume = Insp2p() / GamanVolume_Insp2();           // インスピステージ２の質量（インスピ3値以降があれば取り除く）
+        double Insp3_Volume = Insp3p() / GamanVolume_Insp3();           // インスピステージ３の質量（インスピ4値以降があれば取り除く）
+        double Insp_Volume = Insp1_Volume
+            + Insp2_Volume
+            + Insp3_Volume
+            ;               // インスピ質量（圧縮適用されたもの）
+
+
+        double Insp_Left = Gaman - Insp;                                   // 残りインスピ量
+        double Insp_Left_Rate = Insp_Left / Gaman;                       // その割合
+        double IV_Left = Gaman - Insp_Volume;
+        double IV_Left_Rate = IV_Left / Gaman;                          // 残りインスピ質量
+
+        // 100%に達するための質量は0.1
+        //double Insp_Left = 0.01f - Insp_Volume;                           // 残りインスピ量
+        //double Insp_Left_Rate = Insp_Left / 0.1f;                       // その割合
+        //double Insp_Left_Rate = (Gaman - Insp) / Gaman; // その割合
+
+        // 初期の残りがまん量は90くらい（初期のインスピ許容値が10として）
+        // 初期の残りインスピ量は10くらい
+        // 割合で示すと我慢量が90%、インスピ量が100%
+        // この割合が等しくなるように我慢量を増やす？
+
+        // 残りがまん量の割合に対する、残りインスピ量の割合
+        // （どれだけがまんする余地があるか）
+        double a = Gaman_Left_Rate - Insp_Left_Rate;
+
+        // インスピが切迫している場合、ちょっとずつがまんする
+        // それが追い付かないと爆発する
+        double UpGaman = Gaman_Limit * a * 0.01f * dTime;
+        //Gaman += UpGaman;
+        Gaman_p = Insp2;
+        Gaman = 0.1f + Gaman_p;
+        // 0除算を防ぐために下駄を履かせる
+        // 純粋な値はGaman_p値
+
+        if (true)
+        //if (UpGaman > 0)
+        {
+            // インスピ3値に圧縮する
+            // a3 - どれだけステージ3までガマンできるか
+            double aa3 = (Gaman_Limit_p - 1.0f);             // ステージ3の総ガマン量
+            double ab3 = 0;                          // そのうちの残りガマン量
+            double a3 = 0;                           // 残りガマン量の割合
+            if (aa3 > 0)
+            {
+                ab3 = aa3 - Insp3;                   // そのうちすでにガマンしてる分を差し引く
+                a3 = ab3 / aa3;                   　 // 残りガマン量の割合
+            }
+
+            // a3が0以上ならガマン出来る
+            if (ab3 > 0)
+            {
+                double UpInsp3_a = ab3 * Insp2p();
+                // 残りガマン量と残りインスピ量を掛け合わせる
+                double UpInsp3 = UpInsp3_a * Insp2p_Rate() * 0.1f;
+                // そこにさらにインスピ質量で増加量を補正する
+                Insp3 += UpInsp3 * dTime;
+                //UpGaman -= UpGaman3;
+                if (Insp3 > Insp2) Insp3 = Insp2;
+            }
+
+            // インスピ2値に圧縮する
+            double aa2 = (Gaman_Limit_p);             // ステージ2の総ガマン量
+            double ab2 = 0;                          // そのうちの残りガマン量
+            double a2 = 0;                           // 残りガマン量の割合
+            if (aa2 > 0)
+            {
+                ab2 = aa2 - Insp2;                   // そのうちすでにガマンしてる分を差し引く
+                a2 = ab2 / aa2;                   　 // 残りガマン量の割合
+            }
+
+            // a2が0以上ならガマン出来る
+            if (ab2 > 0)
+            {
+                double UpInsp2_a = ab2 * Insp1p();
+                // double UpInsp2_a = ab2 * Insp1p_Rate();
+                // Rateに設定するとがまん限界の上昇に従ってレートが低下して
+                // がまんが上昇しなくなってしまう
+                double UpInsp2 = UpInsp2_a * Insp1p_Rate() * 1.0f;
+                Insp2 += UpInsp2 * dTime;
+                //Insp2 += UpGaman * Insp1p_Rate();
+                if (Insp2 > Insp) Insp2 = Insp;
+            }
+        }
+
+        // とりあえず我慢上限の1割を下回らないようにする
+        //if (Gaman < Gaman_Limit * 0.1f)
+        //{
+        //    Gaman = Gaman_Limit * 0.1f;
+        //}
+
+        if (Gaman < 0.1f)
+        {
+            Gaman = 0.1f;
+        }
+
+        if (Gaman < Haki_Komi_b)
+        {
+            Gaman = Haki_Komi_b;
+            // ちょっと吐き切るまで我慢してて
+            // まさかのはきこみb値が使えそうと判明
+        }
+
+        // 最後にふっくら値で補正をかける
+        // Gaman_p += Fkr;
+        // Gaman += Fkr;
+
+        // 我慢の限界量を超えないようにする
+        if (Gaman > Gaman_Limit)
+        {
+            Gaman = Gaman_Limit;
+        }
+    }
+
+    void UpdateGamanLimit()
+    {
+        //Iroduki_Limit_Base = 50 + Mathf.Pow((float)Product / 100, 0.5f) * 100;          // 総生産量に基づいてインスピ許容値がインフレ
+
+        // がまん値（インスピ許容値の流用）
+        // 総生産量に基づいてインスピ許容値がインフレ
+        GamanRaw_Limit_p = 1 + Mathf.Pow((float)Product + 1, 0.5f) - 1;
+        // 100生産して10倍になるくらいの量
+
+        GamanRaw_Limit = GamanRaw_Limit_p + 0.1f;
+        // 0除算を防ぐための下駄履き
+
+        // ふっくら値を加算する
+        Gaman_Limit_p = GamanRaw_Limit_p + Fkr;
+        Gaman_Limit = GamanRaw_Limit + Fkr;
+
+        // Gaman_Limit = 1 + (float)(Product / 10);
+        // Iroduki_Limit_Base = 10 + (float)((Product - StatIrodukiAbsorbInsp) / 10) * 2;    
+        // Iroduki_Limit = Iroduki_Limit_Base;
+    }
+
+    // がまん率
+    // "reverse"を引数にすると逆レートを返す
+    public float Gaman_Rate(string reverse = "")
+    {
+        float r = (float)(Gaman_p / Gaman_Limit_p);
+        if (r < 0) r = 0;
+        if (r > 1) r = 1;
+        if (reverse == "reverse") return 1 - r;
+        return r;
+    }
+
+    // がまん値による圧縮率を返す
+    // 0.1で1、1で10、10で100……
+    public double GamanVolume()
+    {
+        return Gaman * 10f;
+    }
+
+    // ステージ２のインスピ値は圧縮率最大10倍
+    public double GamanVolume_Insp2()
+    {
+        /*double _GamanVolume = GamanVolume();
+        if (_GamanVolume > 10)
+        {
+            return 10.0f;
+        }
+        
+        return _GamanVolume;*/
+        return 10.0f;
+    }
+
+    public double GamanVolume_Insp3()
+    {
+        /*double _GamanVolume = GamanVolume();
+        if (_GamanVolume > 100)
+        {
+            return 100;
+        }
+
+        return _GamanVolume;*/
+        return 100.0f;
+    }
+
+    // 色づき上限で割って
+    // 指定されたスケールをかけて調整する
+    // 後半に色づきが増えても大きくなりすぎないようにする調整
+    /*
+    float IPConvertScale(double sc)
+    {
+        // Sqrtはマイナス使うとNaNになるので絶対値を使い、後でマイナスを返す
+        float max_scale = InspPop_MaxScale;
+        float _sc = (float)(Mathf.Sqrt((float)(Mathf.Abs((float)sc)) * (float)(max_scale)));
+        // float _sc = (float)(Mathf.Sqrt((float)(Mathf.Abs((float)sc)) * (float)(max_scale / Gaman_Limit)));
+        // 
+        if (sc < 0)
+        {
+            return -_sc;
+        }
+        return _sc;
+    }*/
+
+    void UpdateDokidoki()
+    {
+        Dokidoki = Insp - Dokidoki_Cap;
+
+        // ドキドキは秒間50%ずつ慣れていく
+        Dokidoki_Cap += Dokidoki * 0.5 * dTime;
+
+        // ドキドキ耐性は10%ずつ減退していく
+        // Dokidoki_Cap -= Dokidoki_Cap * 0.1 * dTime;
+    }
+
+    // ためこみ
+    void UpdateTamekomi()
+    {
+        // 秒間0.5%ずつ増加
+        Tamekomi += (Tamekomi_Limit - Tamekomi) * 0.005 * dTime;
+    }
+
+    // ためこみ限界値更新
+    // 現在色づき限界値のものを流用中
+    void UpdateTamekomiLimit()
+    {
+        //Iroduki_Limit_Base = 50 + Mathf.Pow((float)Product / 100, 0.5f) * 100;          // 総生産量に基づいてインスピ許容値がインフレ
+
+        // 総生産量に基づいてインスピ許容値がインフレ
+        // だけど、インスピを吸収して強引に色づきを上げた場合、色づき限界は上がらない
+        // 結果的にフレーバーが引き金になった生産物によって色づき限界が上がる
+        //Tamekomi_Limit = Tamekomi_Limit_Base + (float)((Product - StatIrodukiAbsorbInsp) / 10) * 2;
+
+        // b41で使用していた最新の式（現在コメントアウト中）
+        //Tamekomi_Limit = Tamekomi_Limit_Base + (float)(Product - (StatIrodukiAbsorbInsp / 10.0f)) * 1;
+    }
+
+    // ■こみあげ上昇補正値
+    // 現在こみあげているかどうかの指数を返す
+    // (CoRrection value)
+    // 実質のバクハツ判定で
+    // 「バクハツ中にすっきり値を減らさない」などの
+    // バクハツ中に何らかの動作を止めたい時に使う変数
+    float KomiageCr()
+    {
+        float KomiageCr = Mathf.Pow(Mathf.Abs((float)(1 - Komiage / (Komiage_Limit + 0.001f))), 10.0f); // 少しでもこみ上げたらすっきりが治らない
+        if (KomiageCr > 1) KomiageCr = 1;
+        return KomiageCr;
+    }
+
+    // 完成
+    void Kansei()
+    {
+        //dProduct += (Komiage - dProduct) * 0.7;    // うにおん「こみあげた分の7割をこれから生産するよ」
+        //dProduct += Funbari;    // うにおん「ふんばった分生産するうにょ」
+
+        GameObject NewProduct;
+
+        //double Productable = Funbari - dProduct;                        // この値は何度も更新する必要がある
+        //if (Productable > Komiage_Limit) Productable = Komiage_Limit;
+
+        // 生産可能でなければどっくん値をこみ上げ値に固定する
+        // そうでないと、音がうるさいことになってしまう
+        //if (Producable() >= 1.0f)
+
+        if (Producable() >= 1.0f)
+        {
+            Kansei_Hakidasi(Umareru);
+        }
+        else
+        {
+            Kansei_Hakidasi(Umareru);
+            //Iroduki -= Dokkun;
+
+            // 色づきロス
+            double a = Umareru * (1 - ((Insp) / (Gaman_Limit + 0.01f))) * 10.0f;
+            // double a = Dokkun * ((Iroduki_Limit + 0.01f) / (Komiage + 0.01f));
+            // double a = Dokkun * ((Iroduki_Limit_Base + 0.01f) / (Komiage + 0.01f));
+            dSukkiri += a;
+            // どっくん値が高いのにふんばりが追い付いていない場合に挙動がおかしくなるので
+            // ふんばり値を無理やり1に設定して残り汁を搾り取ってあげる
+            /*if (Dokkun >= 1)
+            {
+                //Funbari = 1 + dProduct + 0.5f;     // ふんばり値を強制的に１にして最低でもシロップを１つ生産させる（念のため0.5余裕を持たせる）
+                Dokkun = 0;
+            }
+            else
+            {
+                Dokkun = Komiage;
+            }*/
+            
+            if (Producable() > 0.005f)
+            {
+                GameObject NewProdPop;
+                NewProdPop = Instantiate(uuu.ProdPopOrg, new Vector3(0, 0, 0), Quaternion.identity);
+                NewProdPop.GetComponent<ProdPop>().Product = Producable();
+                NewProdPop.GetComponent<ProdPop>().Sukkiri = a;
+                NewProdPop.GetComponent<ProdPop>().uuu = this.uuu;
+                NewProdPop.GetComponent<ProdPop>().mt = this;
+                NewProdPop.GetComponent<ProdPop>().times = 1;               // 応急処置：timesが０だと表示時間なしと見なされて消去される？
+                un.ProdPops = new List<GameObject>();                       // 生産ポップ配列初期化ProdPops.Add(NewProdPop);
+            }
+            Birth(Umareru);
+            un.ProductHeart += Umareru;
+        }
+
+        if (Producable() >= 1.0f)
+        {
+            // 基本的にインスピ限界に応じた生産量ですっきりするが
+            // こみ上げが少ないと、同じこみあげでもすっきりしてしまう
+            // こみ上げが多い方（色づきが多い方）が有利
+            // 残り汁ですっきりしすぎないように初期の大きなこみあげ値で計算
+            double a = Umareru * (Iroduki_Limit_Base / Komiage);
+            dSukkiri += a;
+            //Dokkun = 0;
+            //Debug.Log(Funbari.ToString("F3") + " 生産して " + a.ToString("F3") + " すっきりしました。");
+                                                                     // (1.0f * (Iroduki - Funbari) / Insp_Limit));
+                                                                     // (1.0f + (2.0f - (Iroduki - Funbari) / Insp_Limit));   // 減った後の色づき値で計算
+            if (dSukkiri > Iroduki_Limit) dSukkiri = Iroduki_Limit;
+
+            GameObject NewProdPop;
+
+            NewProdPop = Instantiate(uuu.ProdPopOrg, new Vector3(0, 0, 0), Quaternion.identity);
+            NewProdPop.GetComponent<ProdPop>().Product = Mathf.Floor((float)Producable());
+            NewProdPop.GetComponent<ProdPop>().Sukkiri = a;
+            NewProdPop.GetComponent<ProdPop>().uuu = this.uuu;
+            NewProdPop.GetComponent<ProdPop>().mt = this;
+            NewProdPop.GetComponent<ProdPop>().times = 1;               // 応急処置：timesが０だと表示時間なしと見なされて消去される？
+            un.ProdPops.Add(NewProdPop);
+        } else
+        {
+            // dSukkiri += (1 - EasyMath.PowCurve(Iroduki, 5.0f, Iroduki_Limit)) * Iroduki_Limit * 0.001;
+            // 色づきがなくなった分だけすっきりするが動作に違和感しかなかったのでコメントアウト
+        }
+
+        // 生産可能な生産物とグレードを上から順番に走査する
+        for(double b = 9000.0f; Producable() >= 1.0f; /*なし*/ )
+        {
+            double a = Umareru / 2;
+            if (a < 1) a = 1.1f;   // この繰り返し分の中にいる間には生産可能量は1を超えている
+            if (a >= b)
+            {
+                un.ProductFlavor_Num++;
+                if (b >= 1000.0f)            // エレメント
+                {
+                    NewProduct = Instantiate(uuu.Prod_ElmK_Org, new Vector3(0, 0, 0), Quaternion.identity);
+                    NewProduct.GetComponent<Product>().Grade = (int)(b / 1000);        // シロップの生産量は1の倍数
+                }
+                else if (b >= 100.0f)       // モチ
+                {
+                    NewProduct = Instantiate(uuu.Prod_Moti_Org, new Vector3(0, 0, 0), Quaternion.identity);
+                    NewProduct.GetComponent<Product>().Grade = (int)(b / 100);      // モチの生産量は100の倍数
+                }
+                else if (b >= 10.0f)        // ホイップ
+                {
+                    NewProduct = Instantiate(uuu.Prod_Whip_Org, new Vector3(0, 0, 0), Quaternion.identity);
+                    NewProduct.GetComponent<Product>().Grade = (int)(b / 10);       // ホイップの生産量は10の倍数
+                }
+                else                        // シロップ
+                {
+                    NewProduct = Instantiate(uuu.Prod_Syrup_Org, new Vector3(0, 0, 0), Quaternion.identity);
+                    NewProduct.GetComponent<Product>().Grade = (int)(b / 1);        // シロップの生産量は1の倍数
+                }
+                NewProduct.SetActive(false);
+                NewProduct.GetComponent<Product>().uuu = this.uuu;
+                NewProduct.GetComponent<Product>().Union = un;
+                NewProduct.GetComponent<Product>().Born_Pos = un.transform.Find("Anim/Shadow_Pos").gameObject.transform.position.y;
+                un.ProductFlavors.Add(NewProduct);
+                Birth(b);
+            }
+            else
+            {
+                // 対象の生産物のグレードを１つずつ下げていく
+                if (b >= 200.0f)            // 生産量が100の時は90になる
+                {
+                    b -= 100.0f;
+                }
+                else if (b >= 20.0f)        // 生産量が10の時は9になる
+                {
+                    b -= 10.0f;
+                }
+                else if (b >= 2.0f)
+                {
+                    b -= 1.0f;
+                }
+                else break;
+            }
+        }
+        // 最後にふんばりを0にする
+        // b41の仮仕様
+        Umareta = Umareru;
+        Umareru = 0;
+        Funbari = 0;
+
+        ui.ip.fKansei = true;
+        /*if (fCoreGenB)
+        {
+            fCoreGenB = false;
+            rCoreGenC = 0;
+            PreUmareru = 0; // 次のフレームでフラグが立たないための調整
+            dbg(2, 22, "× = 世代交代開始");
+        }
+
+        dbg(2, 25, "InspPop_fKanseiがKansei()でfalse");*/
+    }
+
+    // 完成してこみ上げたものを吐き出す
+    // はきこみ値の処理
+    void Kansei_Hakidasi(double _Umareru)
+    {
+        if (fHaki)
+        {
+            Haki += _Umareru;
+            double Haki_Rate_Up = _Umareru / (Insp + 0.01f);    // はきだし率上昇
+
+            // 
+            Haki_Rate += (1 - Haki_Rate) * Haki_Rate_Up;        // 一度吐いた後が全体のインスピ量なのをお忘れなく
+
+            if (1 - Haki_Rate < 0.01f)
+            {
+                Haki_Rate = 0.99f;
+            }
+
+            // スコア更新
+            // 1点下駄を履く
+            // はきだし率上限が99%である都合
+            if (Score < (Haki_Rate * 100 + 1)
+                && Komiage > 0.0001f
+                && Haki_Komi > 0.0001f)
+            {
+                Score = Haki_Rate * 100 + 1;       // スコア更新
+            }
+
+            if (Score > 100)
+            {
+                Score = 100;
+            }
+        }
+        Haki_Komi -= _Umareru;
+        UpdateHakikomi();
+    }
+
+    // 生産
+    // 指定された生産量を生産する
+    public void Birth(double ProductAmount)
+    {
+        dProduct += ProductAmount;
+    }
+
+    //***********************************************************************
+    //***********************************************************************
+    //***********************************************************************
+    //***********************************************************************
+    //***********************************************************************
+    //***********************************************************************
+    // 生産
+    // うにおんがふんばって産まれた生産物の処理
+    public void Production()
+    {
+        // 本来ふんばれば一気に産まれるけど
+        // いきなり最高速度で産まれるのではなく、少し溜めを入れる
+        // 生産中のdProductを少しずつddProductに加算して少しずつ生産処理をする
+
+        // ddProductで処理し切れていない生産物を加算しないようにする
+        dddProduct = (dProduct - ddProduct) * 5.0f * dTime;
+        ddProduct += dddProduct;
+
+        // 色づきがあるけど、インスピが足りない場合は？
+        if (false)
+        {
+            if (Insp > ddProduct * 0.1)
+            {
+                Insp -= ddProduct * 5.0f * dTime;
+
+            }
+            else
+            {
+                Insp = 0;
+            }
+        }
+
+        double _DownInsp = ddProduct * 5.0f * dTime;
+        // 溜め込んだ物は生産によって吐き出される
+        // b50からインスピから直接吐き出される
+        if (mInspMinus == ("minus"))
+        {
+            
+            DownInsp(_DownInsp);
+        }
+
+        // b56からマイナスインスピを上げる仕様にしてみる
+        if (mInspMinus == ("absorb"))
+        {
+            InspMinus += _DownInsp;
+        }
+
+        //Iroduki -= ddProduct * 5.0f * dTime;
+        Tamekomi -= ddProduct * 5.0f * dTime;
+
+        Product += ddProduct * 5.0f * dTime;
+        dProduct -= ddProduct * 5.0f * dTime;
+        //Komiage -= ddProduct * 5.0f * dTime;
+        //Umareru -= ddProduct * 0.1;
+        //Funbari -= ddProduct * 5.0f * dTime;
+        // こみあげる量はインスピとこみあげの合計
+        /*if (Iroduki < ddProduct * 0.1)
+        {
+            Insp -= ddProduct * 0.1;
+        } else
+        {
+            Iroduki -= ddProduct * 0.1;
+        }*/
+        ddProduct -= ddProduct * 5.0f * dTime;
+
+        Sukkiri += dSukkiri * 0.25 * dTime;
+        StatSukkiri += dSukkiri * 0.25 * dTime;
+        dSukkiri -= dSukkiri * 0.25 * dTime;
+
+        //if (Komiage < 0) Komiage = 0;
+        //if (Funbari < 0) Funbari = 0;
+        //if (Insp < 0) Insp = 0;
+
+        // 生産物が本当に生まれる判定（テスト）
+        double ProducingAmount = 0;
+
+        if (Producing < un.ProductFlavor_Num)  // １個生産されるまで、０も参照されない
+        {
+            if (un.ProductFlavors[Producing].GetComponent<Product>().Type == "ElmK") ProducingAmount = 1000f;
+            if (un.ProductFlavors[Producing].GetComponent<Product>().Type == "Moti") ProducingAmount = 100f;
+            if (un.ProductFlavors[Producing].GetComponent<Product>().Type == "Whip") ProducingAmount = 10f;
+            if (un.ProductFlavors[Producing].GetComponent<Product>().Type == "Syrup") ProducingAmount = 1f;
+
+            if (ProducingAmount < Product + 0.1f - Produced) // 0.1fだけ余裕を持たせる
+            {
+                int ProdID = 0;
+                if (un.ProductFlavors[Producing].GetComponent<Product>().Type == "ElmK")
+                {
+                    ProdID = 30;
+                    uuu.SEProduction4.Play();
+                }
+                if (un.ProductFlavors[Producing].GetComponent<Product>().Type == "Moti")
+                {
+                    ProdID = 20;
+                    uuu.SEProduction3.Play();
+                }
+                if (un.ProductFlavors[Producing].GetComponent<Product>().Type == "Whip")
+                {
+                    ProdID = 10;
+                    uuu.SEProduction2.Play();
+                }
+                if (un.ProductFlavors[Producing].GetComponent<Product>().Type == "Syrup")
+                {
+                    ProdID = 0;
+                    uuu.SEProduction.Play();
+                }
+                ProdID += un.ProductFlavors[Producing].GetComponent<Product>().Grade;  // モチ４なら、20+4 で 24
+                un.ProductItems[ProdID]++;
+                un.ProductFlavors[Producing].SetActive(true);
+                Producing++;
+                Produced += ProducingAmount;
+            }
+        }
+
+#if b55
+        // 生産物情報表示
+        int[] pi = Union.ProductItems;
+        Union.ProdInfo.text = "\n\n\n" + "== Product Informations ==" + "\n" +
+            "Product = " + Product.ToString("F0") + "\n" +
+            "ProductHeart = " + ProductHeart.ToString("F4") + "\n" +
+            "Syrup : " +
+                pi[1].ToString("D4") + " " + pi[2].ToString("D4") + " " + pi[3].ToString("D4") + " " + pi[4].ToString("D4") + " " + pi[5].ToString("D4") + " " +
+                pi[6].ToString("D4") + " " + pi[7].ToString("D4") + " " + pi[8].ToString("D4") + " " + pi[9].ToString("D4") + "\n" +
+                " Whip : " +
+                pi[11].ToString("D4") + " " + pi[12].ToString("D4") + " " + pi[13].ToString("D4") + " " + pi[14].ToString("D4") + " " + pi[15].ToString("D4") + " " +
+                pi[16].ToString("D4") + " " + pi[17].ToString("D4") + " " + pi[18].ToString("D4") + " " + pi[19].ToString("D4") + "\n" +
+                " Moti : " +
+                pi[21].ToString("D4") + " " + pi[22].ToString("D4") + " " + pi[23].ToString("D4") + " " + pi[24].ToString("D4") + " " + pi[25].ToString("D4") + " " +
+                pi[26].ToString("D4") + " " + pi[27].ToString("D4") + " " + pi[28].ToString("D4") + " " + pi[29].ToString("D4") + "\n" +
+                " ElmK : " +
+                pi[31].ToString("D4") + " " + pi[32].ToString("D4") + " " + pi[33].ToString("D4") + " " + pi[34].ToString("D4") + " " + pi[35].ToString("D4") + " " +
+                pi[36].ToString("D4") + " " + pi[37].ToString("D4") + " " + pi[38].ToString("D4") + " " + pi[39].ToString("D4") + "\n" +
+                "flIncProd = " + dbgflIncProd.ToString("F2") + "\n" +
+                "flLimProd = " + dbgflLimProd.ToString("F2") + "\n" +
+                "";
+
+        // 表示時間を過ぎた生産物を消去（仮）
+        for (int i = Union.ProductFlavors.Count - 1; i >= 0; i--)
+        {
+            if (Union.ProductFlavors[i].GetComponent<Product>().TimesLeft< 0)
+            {
+                if (ProductFlavors[i].GetComponent<Product>().Type == "Moti") Produced -= 10.0f;
+                if (ProductFlavors[i].GetComponent<Product>().Type == "Whip") Produced -= 1.0f;
+                if (ProductFlavors[i].GetComponent<Product>().Type == "Syrup") Produced -= 0.1f;
+
+                Producing--;
+                ProductFlavor_Num--;
+
+                Destroy(ProductFlavors[i]);
+                Union.ProductFlavors.Remove(ProductFlavors[i]);
+            }
+        }
+    
+        // 生産ポップ処理
+        // 表示時間を過ぎたポップを消去
+        for (int i = 0; i < Union.ProdPops.Count; i++)
+        {
+            if (Union.ProdPops[i].GetComponent<ProdPop>().times< 0)
+            {
+                Destroy(Union.ProdPops[i]);
+                Union.ProdPops.Remove(Union.ProdPops[i]);
+            }
+        }
+#endif
+    }
+
+    // Kansei用関数
+    // 完成時の生産可能量を計算する
+    // ふんばりの値がすでに生産予約された生産物で枯渇してるのを考慮したり
+    // インスピが切れているのに生産予約されるのを防ぐ
+
+    double Producable()
+    {
+        double _Producable = Umareru - dProduct;
+        // if (_Producable > Komiage_Limit) _Producable = Komiage_Limit;
+        //_Producable = Mathf.Floor(_Producable);
+        return _Producable;
+    }
+
+    // 完成
+    void Kansei_Old()
+    {
+        //dProduct += (Komiage - dProduct) * 0.7;    // うにおん「こみあげた分の7割をこれから生産するよ」
+        //dProduct += Funbari;    // うにおん「ふんばった分生産するうにょ」
+
+        GameObject NewProduct;
+
+        if (Funbari > 1.0f)
+        {
+            // 基本的にインスピ限界に応じた生産量ですっきりするが
+            // こみ上げが少ないと、同じこみあげでもすっきりしてしまう
+            // こみ上げが多い方（色づきが多い方）が有利
+            double a = Funbari * (Insp_Limit / Komiage + 0.0001f);
+            dSukkiri += a;
+            //Debug.Log(Funbari.ToString("F3") + " 生産して " + a.ToString("F3") + " すっきりしました。");
+            // (1.0f * (Iroduki - Funbari) / Insp_Limit));
+            // (1.0f + (2.0f - (Iroduki - Funbari) / Insp_Limit));   // 減った後の色づき値で計算
+            if (dSukkiri > Iroduki_Limit) dSukkiri = Iroduki_Limit;
+
+            GameObject NewProdPop;
+
+            NewProdPop = Instantiate(uuu.ProdPopOrg, new Vector3(0, 0, 0), Quaternion.identity);
+            NewProdPop.GetComponent<ProdPop>().Product = Funbari;
+            NewProdPop.GetComponent<ProdPop>().Sukkiri = a;
+            NewProdPop.GetComponent<ProdPop>().uuu = this.uuu;
+            NewProdPop.GetComponent<ProdPop>().mt = this;
+            NewProdPop.GetComponent<ProdPop>().times = 1;               // 応急処置：timesが０だと表示時間なしと見なされて消去される？
+            un.ProdPops.Add(NewProdPop);
+        }
+
+        if (Funbari - dProduct > 200.0f)
+        {
+            //Production3.Play();
+            while (Funbari - dProduct > 200.0f)
+            {
+
+                // アイテムの生産
+                // アイテムの出現
+                //Prod_Moti_Org = (GameObject)Resources.Load("Prod_Moti");
+                un.ProductFlavor_Num++;
+
+                NewProduct = Instantiate(uuu.Prod_Moti_Org, new Vector3(0, 0, 0), Quaternion.identity);
+                NewProduct.SetActive(false);
+                NewProduct.GetComponent<Product>().Union = un;
+                NewProduct.GetComponent<Product>().Born_Pos = un.transform.Find("Body/Shadow_Pos").gameObject.transform.position.y;
+                un.ProductFlavors.Add(NewProduct);
+                Birth(100.0f);
+            }
+        }
+
+        if (Funbari - dProduct > 20.0f)
+        {
+            //Production2.Play();
+            while (Funbari - dProduct > 20.0f)
+            {
+                un.ProductFlavor_Num++;
+
+                NewProduct = Instantiate(uuu.Prod_Whip_Org, new Vector3(0, 0, 0), Quaternion.identity);
+                NewProduct.SetActive(false);
+                NewProduct.GetComponent<Product>().Union = un;
+                NewProduct.GetComponent<Product>().Born_Pos = un.transform.Find("Body/Shadow_Pos").gameObject.transform.position.y;
+                un.ProductFlavors.Add(NewProduct);
+                Birth(10.0f);
+            }
+        }
+
+        if (Funbari - dProduct > 1.0f)
+        {
+            //Production.Play();
+            while (Funbari - dProduct > 1.0f)
+            {
+                un.ProductFlavor_Num++;
+
+                NewProduct = Instantiate(uuu.Prod_Syrup_Org, new Vector3(0, 0, 0), Quaternion.identity);
+                NewProduct.SetActive(false);
+                NewProduct.GetComponent<Product>().Union = un;
+                NewProduct.GetComponent<Product>().Born_Pos = un.transform.Find("Body/Shadow_Pos").gameObject.transform.position.y;
+                un.ProductFlavors.Add(NewProduct);
+                Birth(1.0f);
+            }
+        }
+
+        //Komiage -= Funbari - dProduct;
+        //Insp -= Funbari - dProduct;
+        //Funbari -= Funbari - dProduct;
+
+        //Iroduki -= dProduct;
+        //Komiage -= dProduct;
+
+        //gauge_grid = 0;
+        //Insp = 0;                           // ミクスチャに干渉するゲージ（削除候補）
+        //UI.Insp = 0;
+        //Insp_Limit = Insp_Limit_Base;
+    }
+}
+
+
