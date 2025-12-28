@@ -24,6 +24,7 @@ public sealed class InspPopView : MonoBehaviour
     [SerializeField] private Color color50 = Color.white;          // 50%
     [SerializeField] private Color color100 = Color.yellow;        // 100%
     [SerializeField] private Color color200 = Color.red;           // 200%
+    [SerializeField] private Color color500 = Color.black;         // 500%
 
     private void OnEnable()
     {
@@ -95,6 +96,12 @@ public sealed class InspPopView : MonoBehaviour
             return Color.Lerp(color100, color200, t);
         }
 
-        return color200;
+        if (ratio100 <= 5.0f)
+        {
+            var t = (ratio100 - 2.0f) / 3.0f;
+            return Color.Lerp(color200, color500, t);
+        }
+
+        return color500;
     }
 }
