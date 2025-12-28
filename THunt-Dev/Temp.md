@@ -7,4 +7,10 @@ THunt-Dev/Temp.md
   - Codex自身もここが実行されたら停止を促してください
 
 # レベル2
-Assets\Script\Orchestrator.md を開いて、その指示に従って作業してください。
+THunt-Dev\Orchestrator.md を開いて、その指示に従って作業してください / やり直してください。
+
+# チャットクローズ
+これにてチャットクローズします。
+/THunt-Framework/Core/AGENTS.mdの「チャットクローズ」の項目に従い
+Chat.mdからヘッダー案をお願いします。
+(Chat.mdが確認できなければ、出力を中断してください)
