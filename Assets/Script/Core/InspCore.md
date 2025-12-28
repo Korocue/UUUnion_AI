@@ -35,7 +35,6 @@ public double Tick(double dt)（毎フレーム呼ぶ。戻り値は今回変換
 InspCore を保持して Tick(Time.deltaTime) を呼ぶ
 右クリックで AddMix(mixPerClick) を呼ぶ
 表示対象 Transform inspPop のスケールを Insp で更新
-テスト用ログを1秒に1回出す（Insp/Mix/movedを表示）
 
 ## Assets/Script/UI/InspPop/InspPopView.cs
 Presenterから渡された値で見た目更新だけする

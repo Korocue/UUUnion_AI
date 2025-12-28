@@ -12,6 +12,12 @@ AGENTS.md
 - 依存追加は必ず確認
 - 可能なら編集後にテスト（後述）を回す
 
+# Unityの仕様について
+ファイル名とオブジェクトにアタッチするクラス名は必ず一致させてください。
+> 例
+> public sealed class GameDebugOverlay : MonoBehaviour
+> 以上のクラスは必ずGameDebugOverlay.csに作成すること
+
 # 「CQ」のつく命令について
 "# CQxx(xxは数字)"形式でされた質問を"## CAxx"の形式で返してください。
 可能ならChat.mdの該当のセクションに以下のフォーマットで記録してください。

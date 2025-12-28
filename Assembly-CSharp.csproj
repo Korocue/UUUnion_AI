@@ -66,6 +66,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Script\UI\InspPop\InspPopView.cs" />
+    <Compile Include="Assets\Script\Core\Debug\GameDebugOverlay.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopPresenter.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopInput.cs" />
     <Compile Include="Assets\Script\Core\InspCore.cs" />
