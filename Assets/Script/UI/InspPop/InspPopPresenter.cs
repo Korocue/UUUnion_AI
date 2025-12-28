@@ -1,20 +1,24 @@
 using UnityEngine;
 
-// このファイルは InspCore（数値ロジック）を保持し、毎フレーム Tick して表示へ反映する。
-// 仕様: Assets/Script/Core/InspCore.md
+// Presenter for InspPop: owns core data and updates view each frame.
+// Spec: Assets/Script/Core/InspCore.md
 public sealed class InspPopPresenter : MonoBehaviour
 {
     [Header("Bindings")]
     [SerializeField] private InspPopView view;
+    [SerializeField] private GamanPopView gamanView;
     [SerializeField] private InspPopInput input;
 
     [Header("Tuning")]
-    [SerializeField] private float mixPerClick = 0.01f; // 右クリック 1 回で増える Mix（= 1%）
+    [SerializeField] private float mixPerClick = 0.01f; // Mix per input (1% = 0.01).
 
     private readonly InspCore _core = new InspCore();
+    private readonly MixRateTracker _mixRateTracker = new MixRateTracker();
+    private readonly GamanCore _gamanCore = new GamanCore();
 
     private float _logTimer;
     private double _movedSinceLastLog;
+    private double _mixAddedThisFrame;
 
     private void OnEnable()
     {
@@ -34,44 +38,53 @@ public sealed class InspPopPresenter : MonoBehaviour
 
     private void Update()
     {
-        // 入力が未設定でも最低限動くよう、右クリックを直接検知するフォールバック。
+        // Fallback: detect right click when no input binding is set.
         if (input == null && Input.GetMouseButtonDown(1))
         {
             OnRightClicked();
         }
 
-        // 毎フレーム、Mix→Insp 変換を進める。
-        var moved = _core.Tick(Time.deltaTime);
+        var dt = Time.deltaTime;
+
+        // Mix -> Insp conversion.
+        var moved = _core.Tick(dt);
         _movedSinceLastLog += moved;
 
-        // 見た目は Insp で更新する（View は表示だけ）。
+        var mixAdded = _mixAddedThisFrame;
+        _mixAddedThisFrame = 0.0;
+
+        var mixAvgSpeed = _mixRateTracker.Tick(mixAdded, dt);
+        _gamanCore.Tick(_core.Insp, mixAvgSpeed, mixPerClick, dt);
+
+        // View update.
         if (view != null)
         {
-            view.ApplyInsp(_core.Insp);
+            view.ApplyInsp(_core.Insp, _gamanCore.GamanValue);
         }
 
-        // デバッグ表示用に主要値を登録する（表示自体は GameDebugOverlay が担当）。
-        RegisterDebugValues();
-
-        // チュートリアル用ログ（1 秒に 1 回）。
-        _logTimer += Time.deltaTime;
-        if (_logTimer >= 1.0f)
+        if (gamanView != null)
         {
-            _logTimer -= 1.0f;
-            Debug.Log($"[InspPop] Insp={_core.Insp:F3} Mix={_core.Mix:F3} moved={_movedSinceLastLog:F3}");
-            _movedSinceLastLog = 0.0;
+            gamanView.ApplyGaman(_gamanCore.GamanValue);
         }
+
+        // Debug values (rendered by GameDebugOverlay).
+        RegisterDebugValues(mixAvgSpeed);
     }
 
-    private void RegisterDebugValues()
+    private void RegisterDebugValues(double mixAvgSpeed)
     {
         GameDebug.Set("Insp", $"{_core.Insp:F3}");
         GameDebug.Set("Mix", $"{_core.Mix:F3}");
+        GameDebug.Set("MixAvg", $"{mixAvgSpeed:F4}");
+        GameDebug.Set("Limit", $"{_gamanCore.LimitSpeed:F4}");
+        GameDebug.Set("GamanA", $"{_gamanCore.LoadRatioA:F3}");
+        GameDebug.Set("Gaman", $"{_gamanCore.GamanValue:F3}");
     }
 
     private void OnRightClicked()
     {
-        // 仕様: 右クリックで Mix が増える。
+        // Mix increases on right click (spec: InspCore.md).
         _core.AddMix(mixPerClick);
+        _mixAddedThisFrame += mixPerClick;
     }
 }

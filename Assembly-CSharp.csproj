@@ -65,8 +65,13 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.0.21f1\Editor\Data\Tools\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Script\UI\GamanPop\GamanPopView.cs" />
+    <Compile Include="Assets\Script\Core\GamanCore.cs" />
+    <Compile Include="Assets\Script\Core\EmaHalfLife.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopView.cs" />
+    <Compile Include="Assets\Script\Core\Debug\GameDebugOverlay.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopPresenter.cs" />
+    <Compile Include="Assets\Script\Core\MixRateTracker.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopInput.cs" />
     <Compile Include="Assets\Script\Core\InspCore.cs" />
   </ItemGroup>

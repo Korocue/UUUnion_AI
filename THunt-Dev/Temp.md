@@ -8,3 +8,8 @@ THunt-Dev/Temp.md
 
 # レベル2
 THunt-Dev\Orchestrator.md を開いて、その指示に従って作業してください / やり直してください。
+
+# チャットクローズ
+これにてチャットクローズします。
+/THunt-Framework/Core/AGENTS.mdの「チャットクローズ」の項目に従い
+ヘッダー案をお願いします。

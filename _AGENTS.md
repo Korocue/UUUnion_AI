@@ -5,12 +5,22 @@ AGENTS.md
 「THunt-Framework/Core/AGENTS.md」を拡張して扱い、従ってください。
 <AppRoot>をリポジトリ直下とし、基本的な編集範囲とします。
 - /THunt-Dev/及び/THunt-Framework/の編集を禁止します。
+  - /THunt-Dev/ChatRoom/Chat.mdの追記のみ可能です
+    - 削除編集は不可。指定の「CAセクション」の追加のみが可能です。
+- .mdファイルはCodexへ渡すプロンプトなので、編集禁止です
+  - 勝手に内容を変更せず、変更案の提示のみにしてください
 
 # 基本ルール
 - .gitignore に Library/, Temp/, Obj/ 等が入ってる前提で、それらは読まない/触らない
 - 変更は「最小差分」
 - 依存追加は必ず確認
 - 可能なら編集後にテスト（後述）を回す
+
+# Unityの仕様について
+ファイル名とオブジェクトにアタッチするクラス名は必ず一致させてください。
+> 例
+> public sealed class GameDebugOverlay : MonoBehaviour
+> 以上のクラスは必ずGameDebugOverlay.csに作成すること
 
 # 「CQ」のつく命令について
 "# CQxx(xxは数字)"形式でされた質問を"## CAxx"の形式で返してください。

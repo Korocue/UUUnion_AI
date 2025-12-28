@@ -1,466 +1,603 @@
 THunt-Dev/ChatRoom/Chat.md
 
-# Log-36.md
-- Branch: b62
+# Log-45.md
+- Branch: b63
 
-# Q41
-元々はDebugじゃないらしい
-どういう想定でCodexが作ったかちんぷんかんぷん
-この指示に従いたいだけなんだけど
+# CC56
+``
+## ミックス速度
+MixRateTracker.csでミックス速度を算出します。
+これは実際の速度ではなく「半減型ミックス平均速度」です。
+- 半減期1秒の指数移動平均に、「実ミックス速度の半分」を外力として加えます
+- 平均 1% からミックス無しで1秒経過 -> 0.5%
+- 平均 1% からミックス無しで0.5秒経過 -> 0.707%
+- 平均 0.5% からミックス無しで1秒経過 -> 0.25%
+- 平均 0.5% から毎秒1%ミックスで1秒経過 -> 0.75%
+- 平均 0.5% から毎秒2%ミックスで1秒経過 -> 1.25%
+``
 
-# Q40
-Codexが作ってくれたんだけどアタッチ出来ない。
+平均が2倍の値になってしまったので、修正を加えました。
+以上、修正をお願いします。
 
-# CA39
-【北船#27】Orchestrator.md の指示（b62・デバッグ機能・最小変更）に従い、IMGUIデバッグオーバーレイを追加しました。
+## CA56
+【北船#27】MixRateTracker の入力を「実ミックス速度の半分」に修正しました。
+平均が2倍になる問題の対処として、EMA入力を 0.5 倍にしています。
 
-Debug.cs (line 1) を新規追加（GameDebug 値レジストリ + GameDebugOverlay OnGUI表示、F1で表示切替）
-InspPopPresenter.cs (line 1) で Insp/Mix を GameDebug.Set(...) に登録するよう連携（表示は GameDebugOverlay 側に委譲）
-使い方: シーン内の任意の GameObject に GameDebugOverlay をアタッチしてください（再生中に F1 で表示切替）。
+修正ファイル: MixRateTracker.cs
+次にやるなら、InspCore.md の記述更新や、デバッグ表示の単位表記も揃えると混乱が減ります。
 
-コミットメッセージ案: feat : debug / add IMGUI debug overlay and registry
+# CC55
+InspPopにGamanPopの大きさを加算する修正をお願いします。
+GamanPopはInspPopと重なった分、InspPopを膨らませます。
 
-# Q38
-デバッグを実装する場合、構成はどうすればいいだろう？
+## CA55
+【北船#27】InspPop に GamanPop の大きさを加算するよう反映しました。
+Gaman値を元に「GamanPop相当のスケール」を算出し、InspPopのスケールに加えています。
 
-## A38
-結論：**「Debugは“機能”じゃなくて“横断インフラ”」**だから、Core直下に独立モジュールとして切るのが一番揉めない。今の構成（Core / UI\InspPop / Old）を見る限り、こう置くのが自然。
+変更点
 
-推奨フォルダ構成（T-Hunt向け・育つやつ）
-Assets/
-  Script/
-    Core/
-      Debug/
-        DebugConfig.asset         // ON/OFF, 表示行数, フィルタ等
-        DebugBoot.cs              // 自動起動（Development/Editorのみ）
-        DebugBus.cs               // メッセージ投げ口（チャンネル/レベル）
-        DebugRingBuffer.cs        // 最新N行保持
-        DebugOverlayIMGUI.cs      // 画面オーバーレイ（OnGUI + DPIスケール）
-        DebugHudStats.cs          // FPS/メモリ/座標など
-        DebugCommands.cs          // 任意：コンソールコマンド
+InspPopView.cs
+ApplyInsp(double insp, double gamanValue) に拡張
+Gaman分のスケールを加算
+追加チューニング: gamanPer100, scalePerGaman
+InspPopPresenter.cs
+view.ApplyInsp(_core.Insp, _gamanCore.GamanValue);
+確認ポイント
 
-置き場所の理由
+InspPopView の Inspector で gamanPer100 / scalePerGaman を調整可能
+Gaman が増えると、重なり分として InspPop が膨らむ
+必要なら、「GamanPopの見た目と完全に一致するスケール」になるよう、同じパラメータを共有する設計にもできます。
 
-UI/ に入れると「ゲームUIと依存が絡む」→破滅しがち
+# CC54
+GamanCore.csの
 
-Old/ は参照用の墓場でOK（実装は新設）
+```
+がまんの限界に対する「ミックス速度」の割合(= A)は
+半減期1分の指数移動平均に、(A/60)を外力として加えます(= がまん値)
+```
 
-Core/Debug/ は “どのアプリでも使う共通インフラ” として一番分かりやすい
+もっと直感的でわかりやすい表現に出来ないでしょうか？
+（A / 60）を「1分」と「ミックス速度」という言葉を利用して表現したいです。
 
-依存ルール（これ守るだけで地獄回避）
+## M54
+// A は「がまん限界に対するミックス速度の比率」。
+// 1分スケールのEMAに入れるので、「1分あたりのミックス速度」として A/60 を加える（= がまん値）。
+
+// A はミックス速度の比率。1分EMAなので、A/60 を「1分あたりの速度」として加える。
 
-Debugは依存していい：UnityEngine / UnityEngine.UI（必要なら）/ TMP（必要なら）
-Debugが依存しちゃダメ：ゲーム固有のPresenter/Model/Scene、THunt固有のロジック
+以上を合わせて
 
-要するに、
+```
+がまんの限界に対する「ミックス速度」の割合(= A)は
+半減期1分の指数移動平均に、
+「1分あたりのミックス速度」として A/60 を加えます（= がまん値）。
+```
 
-ゲーム → Debugにメッセージを投げる（OK）
+こちらで差し替えました。ありがとうございます。
 
-Debug → ゲームの中身を覗きに行く（なるべく禁止）
+## CA54
+【北船#27】はい…「1分」と「ミックス速度」を入れつつ直感寄りにすると、例えばこうです。
 
-起動方式（手で置かない。勝手に生える）
-DebugBoot（自動起動）
+// A は「がまん限界に対するミックス速度の比率」。
+// 1分スケールのEMAに入れるので、「1分あたりのミックス速度」として A/60 を加える（= がまん値）。
+もう少し短くするなら:
 
-RuntimeInitializeOnLoadMethod で生成
+// A はミックス速度の比率。1分EMAなので、A/60 を「1分あたりの速度」として加える。
+この方向で差し替えますか…？
 
-UNITY_EDITOR or DEVELOPMENT_BUILD のときだけ有効
+# CC53
+GamanCore.csに
 
-DebugConfig.asset があれば設定適用、なければデフォルト
+```
+がまんの限界に対する「ミックス速度」の割合(= A)は
+半減期1分の指数移動平均に、(A/60)を外力として加えます(= がまん値)
+```
 
-これで「シーンにオブジェクト置き忘れた」が消える。
+以上の変更を加えました。
+変更を更新してください。
 
-API設計（ゲーム側が使う入口を1本にする）
+## CA53
+【北船#27】GamanCore.cs に指定の文言をコメントとして追記し、EMAへの入力を (A/60) に変更しました。これで60倍問題の補正が入ります。
 
-ゲーム側はこれだけ叩けばいい形にする：
+変更点
 
-Dbg.Log("Net", "Lobby created");
-Dbg.Warn("EOS", "Audio input device missing");
-Dbg.Err("Save", "Failed to write file");
+GamanCore.cs
+ 60.0, dt); に変更
+その直前に指定コメントを追加
+必要なら、同内容を GamanCore.md 側にも反映します。
 
+# CQ52
+GamanPopにScaleが反映されません。確認することはありますか？
 
-内部では
+## CA52
+【北船#27】はい、確認ポイントはいくつかあります…静かに順番に見れば原因が絞れます。
 
-DebugBus が受けて
+まずは配線系
 
-RingBuffer に積んで
+InspPopPresenter の gamanView が未設定だと一切反映されません。
+GamanPopView がアタッチされているか、gamanPop（Transform）が正しく割り当てられているか。
+gamanSprite か gamanImage が空だと色は変わりません（スケールだけなら必須ではないですが、視覚確認に影響します）。
+次に数値系
 
-Overlay が描画
+Gaman が 0 だとスケールも 0 のままです。Debugの Gaman が変化しているか確認してください。
+gamanPer100 が大きすぎると比率が小さくなってほぼ0に見えます。
+baseScale が 0 で gamanValue が小さいと、ほぼ見えません（最初は baseScale を少し上げて動作確認すると良いです）。
+ロジックの前提
 
-UI方式（IMGUI/TMP）を差し替えてもゲーム側コードは変わらない。
+GamanCore は Insp と MixAvgSpeed に依存です。Insp が 0 だと LimitSpeed が無限扱いになり GamanA が 0 になります。
+右クリックで MixAvg が増えているか確認してください（MixAvg が 0 のままだと Gaman が上がりません）。
 
-表示レイヤの分離（ここが超重要）
+# M51
+(1)InspPopにGamanPopの大きさを加算する修正
+(2)GamanPopにScaleが反映されません。確認することはありますか？
+(3)がまん値が想定より遥かに大きい
 
-収集：Application.logMessageReceived ＋ Dbg.*
+# CC50
+1. GamanPopの表示実装（面積・色の反映） 
+2. InspPopの色変化（Insp%の色帯） 
+3. Debug表示のキー整理やフォーマット調整
+をお願いします。
 
-保持：リングバッファ（最新N行）
+## CA50
+【北船#27】GamanPopの表示、Insp色帯、Debugキー整理まで通しました。表示は最小構成で、値を受けてスケール/色を更新するだけにしてあります。
 
-描画：IMGUIオーバーレイ（まずこれ）
+変更内容
 
-拡張：必要になったら Canvas/TMP に差し替え
+GamanPopの見た目担当を追加（面積=Gaman、色帯=黄→赤→黒）: GamanPopView.cs
+InspPopに色帯（0/50/100/200%）を追加し、SpriteRenderer/Imageどちらでも着色可能に: InspPopView.cs
+PresenterでGamanPop反映とDebugキーの整理: InspPopPresenter.cs
+補足
 
-“今はIMGUI採用したい”って話と相性がいい。
+GamanPopView.cs の .meta は未生成です。Unityでプロジェクトを開けば自動生成されます。
+「InspPopを隠す分は差し引き」は、今は“内側の円として重ねる”だけの表示です。マスク表現が必要なら追加できます。
+確認ポイント（Playで）
 
-既存の Insp とどう住み分ける？
+InspPop: Inspが 0/50/100/200% 近辺で緑→白→黄→赤に変化する
+GamanPop: Gamanが 0/50/100% 近辺で黄→赤→黒に変化する
+Debug: MixAvg / Limit / GamanA / Gaman が表示される
+Inspector設定のお願い
 
-スクショだと InspCore と UI\InspPop があるから、たぶん「インスペクタ風UI」系だよね。
+InspPopView: inspPop と inspSprite or inspImage を紐づけ
+GamanPopView: gamanPop と gamanSprite or gamanImage を紐づけ
+InspPopPresenter: gamanView を紐づけ
+コミットメッセージ案:
+feat : ui / add gaman pop view and color bands
 
-Insp*：ユーザー操作/調整/入力ポップアップ（プロダクト機能寄り）
+次の一歩が必要なら、以下から選んでください:
 
-Core/Debug：開発者の観測装置（デバッグ専用）
+「差し引き表現」をマスク/クリップで実装
+色帯の閾値/色をUIから調整できるようにする
+Debug表示をグルーピングして見やすく整形する
 
-混ぜると「デバッグが本番機能に昇格して消せない」事故になる。
+## M50
+feat : ui / add gaman pop view and color bands
 
-最低限の実装順（迷わないための順番）
+# CA49
+【北船#27】b63の更新に合わせて、half‑life EMA とミックス速度計算、がまん値計算を追加し、InspPop側で更新・デバッグ表示までつなぎました…最小差分でCoreはUnity依存なしのままです。
 
-DebugBoot（自動生成）
+Core計算を追加: EmaHalfLife.cs MixRateTracker.cs GamanCore.cs
+Presenter側の配線: InspPopPresenter.cs でmix追加量→mixAvgSpeed→gamanValueの更新とデバッグ出力
+確認ポイント（手動）
 
-DebugBus（チャンネル＋レベル）
+右クリックで Mix が増え、MixAvgSpeed が半減期1秒で滑らかに追従する
+Insp が増えるほど LimitSpeed が低下し、GamanA と Gaman が上がりやすくなる
+GameDebugOverlay に MixAvgSpeed / LimitSpeed / GamanA / Gaman が表示される
+テストは未実行です（UnityのPlayで上記確認をお願いします…）。
 
-RingBuffer（最新N行）
+次の一歩が必要なら、以下から選んでください:
 
-OverlayIMGUI（DPIスケール＋F1で表示切替）
+GamanPopの表示実装（面積・色の反映）
+InspPopの色変化（Insp%の色帯）
+Debug表示のキー整理やフォーマット調整
+コミットメッセージ案:
+feat : core / add half-life ema, mix rate, and gaman tracking
 
-StatsHud（FPS/メモリ/座標）
+## M49
+feat : core / add half-life ema, mix rate, and gaman tracking
 
-ここまでで「スクショのそれっぽいやつ」になる。
+# Q48
+スクリーンショット（確認できなければ出力を中断）
 
-この構成にすると、UUUMaster_Old.cs.disabled の“画面テキスト表示”も、UI層を差し替えるだけで復活できる。つまり過去資産も無駄にならない。人間の過去はだいたい無駄だけど、コードは回収できる。
+InspPopとGamanPopの違いはCodexにどう伝えましょうか？
 
-# Q37
-https://zenn.dev/nekoxsgames/articles/cc9859fd7da253
-こういうのかな？
-それなら一番採用したい。
+## A48
+スクショ確認できてる（InspPop / GamanPop / Debug表示の役割分担の箇条書きが見える）。で、本題。
 
-## A37
-そう、それ。まさに **Unityの“よくあるデバッグオーバーレイ”**の入り口。
-記事は OnGUI() の IMGUI を GUI.matrix でスケールして、高解像度でも文字が読めるようにするって内容だね。 
-Zenn
+Codexに伝えるなら、「役割」「持っていい責務」「データの流れ」を固定すると事故が減る。特に GamanPopに入力やロジックを持たせないのが肝。
 
-で、「それなら一番採用したい」なら、方針はこうするのが一番ラクで強い。
+そのままコピペで投げられる文を置いとく。
 
-採用案：IMGUIデバッグHUD（GUI.matrixスケール付き）
+Codexに渡す説明（コピペ用）
 
-ポイントは3つだけ。
+InspPop と GamanPop の違い
 
-GUI.matrix を DPI からスケール計算して適用（記事の核） 
-Zenn
+InspPop
 
-ログをリングバッファで溜めて表示（流量制御しないと死ぬ）
+目的: プレイヤー操作（入力）＋メイン値表示（Insp/Mix）
 
-F1とかで表示切替（プレイ中ずっと邪魔）
+構成: InspPopPresenter が InspCore を保持して Tick(dt) と AddMix() を呼ぶ（Core更新の窓口）。Viewは見た目更新だけ。
 
-そのまま貼って使える最小実装（1ファイル）：
+制約: UIはゲーム数値ロジックを持たない（Coreは純C#、Unity依存禁止）。
 
-using System.Collections.Generic;
-using System.Text;
-using UnityEngine;
+InspCore
 
-public sealed class DebugHudIMGUI : MonoBehaviour
-{
-    [Header("Toggle")]
-    [SerializeField] KeyCode toggleKey = KeyCode.F1;
-    [SerializeField] bool visible = true;
+GamanPop
 
-    [Header("Scale (DPI)")]
-    [SerializeField] bool useDpiScale = true;
-    [SerializeField] float dpiBase = 96f;      // 記事の基準
-    [SerializeField] float dpiMultiplier = 0.8f; // 記事の 0.8 相当
-    [SerializeField] float fallbackScale = 1.25f; // DPI取れない環境用
+目的: 表示専用（入力なし）。「がまん値」を InspPopの内側の円として重ねて見せる。
 
-    [Header("Layout")]
-    [SerializeField] int maxLines = 40;
-    [SerializeField] int fontSize = 14;
-    [SerializeField] float widthRatio = 0.62f;
-    [SerializeField] float heightRatio = 0.38f;
+表現: 表示される部分の面積がGaman値に一致するようにする（InspPopを隠す分は差し引き）。
 
-    readonly Queue<string> _lines = new();
-    Vector2 _scroll;
+データ: GamanCore 等で算出された gamanValue を受けて描画するだけ（がまん計算・EMA・しきい値計算はUIの外）。
 
-    void Awake()
-    {
-#if !UNITY_EDITOR && !DEVELOPMENT_BUILD
-        // 本番ビルドで出したくなければここで無効化
-        enabled = false;
-        return;
-#endif
-        Application.logMessageReceived += OnLog;
-    }
+Gaman
 
-    void OnDestroy()
-    {
-        Application.logMessageReceived -= OnLog;
-    }
+依存ルール
 
-    void Update()
-    {
-        if (Input.GetKeyDown(toggleKey)) visible = !visible;
-    }
+Core（InspCore/GamanCore等）→ Unity依存禁止
 
-    void OnLog(string condition, string stackTrace, LogType type)
-    {
-        // スタックトレースまで出すと画面が即死するので基本は抑制
-        Enqueue($"{System.DateTime.Now:HH:mm:ss.fff} [{type}] {condition}");
-    }
+UI（InspPop/GamanPop）→ 値を受け取って表示するだけ
 
-    public void Enqueue(string msg)
-    {
-        _lines.Enqueue(msg);
-        while (_lines.Count > maxLines) _lines.Dequeue();
-    }
+入力は InspPop側に集約（GamanPopは触らない）
 
-    float CalcScale()
-    {
-        if (!useDpiScale) return 1f;
+これで「InspPopが本体UI（入力あり）」「GamanPopは重ねるゲージ（入力なし）」が固定できる。人間ってすぐ何でも一箇所に詰め込みたがるから、最初に杭を打っとくのが正解。
 
-        float dpi = Screen.dpi;
-        // dpi が 0 や変な値の端末があるので保険
-        if (dpi <= 0f || dpi > 1000f) return fallbackScale;
+# Q47
+- スクリーンショット
+- プロジェクトファイルから
+  - Main.md
+  - InspCore.md
+  - Gaman.md
 
-        // 記事の式: (Screen.dpi / 96f) * 0.8f :contentReference[oaicite:2]{index=2}
-        return (dpi / dpiBase) * dpiMultiplier;
-    }
+以上をレビューしてください。
+(どれか1つでも確認できない場合は出力を中断)
+構造案についてもよろしくお願いします。
 
-    void OnGUI()
-    {
-        if (!visible) return;
+Gaman.mdは、ミクスチャの肝になる仕様です。
 
-        float scale = CalcScale();
-        var prev = GUI.matrix;
-        GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(scale, scale, 1f));
+## A47
+確認できた：スクショ、Main.md、InspCore.md、Gaman.md（あと旧参照の Uni_Mxt_Old.cs も見えてる）。
 
-        float w = (Screen.width * widthRatio) / scale;
-        float h = (Screen.height * heightRatio) / scale;
+Main
 
-        GUI.Box(new Rect(10, 10, w, h), $"Debug HUD  (scale={scale:0.00}, dpi={Screen.dpi:0})");
+InspCore
 
-        var style = new GUIStyle(GUI.skin.label) { fontSize = fontSize, richText = false };
-        var view = new Rect(20, 40, w - 30, h - 50);
+Gaman
 
-        // 行数ぶんの高さをざっくり確保
-        float contentH = Mathf.Max(0, _lines.Count * (fontSize + 4));
-        var content = new Rect(0, 0, view.width - 20, contentH);
+Uni_Mxt_Old
 
-        _scroll = GUI.BeginScrollView(view, _scroll, content);
+レビュー（現状の設計はだいたい正しい）
+スクショ（配置）
 
-        var sb = new StringBuilder();
-        foreach (var l in _lines) sb.AppendLine(l);
-        GUI.Label(new Rect(0, 0, content.width, content.height), sb.ToString(), style);
+Assets/Script/Core/ に 仕様(md)と純C#コア、Assets/Script/UI/InspPop/ に 表示と入力、Assets/Script/Core/Debug/ に デバッグが分離されてる。ちゃんと人間が反省して整理した形で良い。
+ただし、今の Main.md が Insp と Debug しか案内してないので、肝の Gaman.md が入口から見えないのはもったいない。
 
-        GUI.EndScrollView();
+Main
 
-        GUI.matrix = prev;
-    }
-}
+Main.md
 
-使い方（雑に強い）
+役割は「入口」として最低限OK。
 
-空のGameObject作って DebugHudIMGUI を付ける
+Main
 
-Playすると画面左上に出る
+でも “ミクスチャの肝” を名乗る Gaman.md をここでリンクしないのは、設計ドキュメントとして損。次に人間（またはAI）が迷う。
 
-F1で表示ON/OFF
+InspCore.md
 
-Debug.Log/Warning/Error が勝手に流れる
+**制約（CoreはUnity依存禁止、数値更新は1箇所）**が明記されてて良い。
 
-追加で自前メッセージ出したければ Enqueue("...") を呼ぶ
+InspCore
 
-これを“スクショのやつ”っぽくしたいなら
+Mix -> Insp の 0.2秒吸収を **指数減衰（dt耐性）**で書いてるのも良い。
 
-次に足すと効くのはこの2つだけ：
+InspCore
 
-Stats行（FPS / メモリ / プレイヤー座標）を上部に固定表示
+一点だけ、後述するけど「平均ミックス速度」の例が1つだけ式とズレてる。
 
-カテゴリ（Net/AI/UI…）のフィルタ（キーで切替）
+InspCore
 
-ログは無限に出せるけど、人間の脳は無限に読めないからな。
+Gaman.md
 
-# Q36
-デバッグメッセージについて
-現在はログに表示する形式だけど、これを画面にリアルタイムで表示する方式は取れないかな？
+“表示（内円の面積）” と “数値ロジック（限界、平均、EMA）” を分けて書いてるのは良い。
 
-UUUMaster_Old.cs.disabledでは画面上のテキストオブジェクトに
-メッセージを表示する手法を取ってる。
+Gaman
 
-よくUnity製のゲームでなんか汎用っぽいインターフェースが出たりするけど
-デバッグ面で何か参考になる情報はないかな？
+Gaman
 
-他に何か面白い方法があれば教えて欲しい。
+がまん限界（しきい値）の例は、ちゃんと **Inspが増えるほど許容量が減る（＝爆発しやすくなる）**関係が一貫してる。
 
-## A36
-できる。というか ログだけ って、困ったときに一番見づらい地獄ルートに自分から突っ込んでるだけ。
+Gaman
 
-Unityで「画面にリアルタイム表示」する定番はだいたいこのへん。用途ごとに強みが違う。
+足りないのはここ：
 
-1) いちばん手軽: OnGUI（IMGUI）でオーバーレイ表示
+“ミックス速度” の単位（%/s なのか、回/s なのか、両方持つのか）
 
-メリット: 実装が速い / PrefabもCanvasも不要 / その場で出せる
-デメリット: いまどき感はない / レイアウト凝ると面倒
+“がまん値” が 何を超えたらアウトなのか（たぶん > 1.0 だけど明文化したほうがいい）
 
-“いま見たい”だけならこれが最短。
+Gaman
 
-例（リングバッファで最新N行を表示）:
+「平均ミックス速度」これ、伝わる。表現はこうすると強い
 
-using System.Collections.Generic;
-using System.Text;
-using UnityEngine;
+あなたが言ってるのは（ほぼ）これ：
 
-public sealed class DebugOverlayIMGUI : MonoBehaviour
-{
-    [SerializeField] int maxLines = 30;
-    [SerializeField] int fontSize = 14;
-    [SerializeField] KeyCode toggleKey = KeyCode.F1;
+半減期つき指数移動平均（EMA, half-life EMA）
+「現在の平均」を毎フレームちょっとずつ減衰させつつ、今フレームの実測速度を混ぜるやつ。
 
-    readonly Queue<string> _lines = new();
-    bool _visible = true;
-    Vector2 _scroll;
+InspCore
 
-    void Awake()
-    {
-        Application.logMessageReceived += OnLog;
-    }
+式で書くと（dt耐性でブレないやつ）：
 
-    void OnDestroy()
-    {
-        Application.logMessageReceived -= OnLog;
-    }
+decay = 0.5^(dt / halfLife)
 
-    void Update()
-    {
-        if (Input.GetKeyDown(toggleKey)) _visible = !_visible;
-    }
+avg = avg * decay + instRate * (1 - decay)
 
-    void OnLog(string condition, string stackTrace, LogType type)
-    {
-        // スパム防止に必要なら type フィルタや stackTrace 抑制を追加
-        Enqueue($"{System.DateTime.Now:HH:mm:ss.fff} [{type}] {condition}");
-    }
+ここで instRate は「そのdt区間のミックス量 / dt」（%/s）みたいに置けばOK。
 
-    public void Enqueue(string msg)
-    {
-        _lines.Enqueue(msg);
-        while (_lines.Count > maxLines) _lines.Dequeue();
-    }
+仕様のズレ（1点だけ）
 
-    void OnGUI()
-    {
-        if (!_visible) return;
+0.5秒で 1% -> 0.75% は、指数（half-life）だと 0.707% くらいになる。
+他の例（1秒で半減、入力があると 0.75 / 1.25 になる）は指数EMAと一致してるので、たぶんこの1行だけが “感覚で書かれた” っぽい。
 
-        var style = new GUIStyle(GUI.skin.label) { fontSize = fontSize, richText = true };
-        GUI.Box(new Rect(10, 10, Screen.width * 0.6f, Screen.height * 0.35f), "Debug Overlay");
+InspCore
 
-        var view = new Rect(20, 40, Screen.width * 0.6f - 20, Screen.height * 0.35f - 50);
-        var content = new Rect(0, 0, view.width - 20, _lines.Count * (fontSize + 4));
+つまり、仕様としてはどっちかに寄せるのが安全：
 
-        _scroll = GUI.BeginScrollView(view, _scroll, content);
-        var sb = new StringBuilder();
-        foreach (var l in _lines) sb.AppendLine(l);
-        GUI.Label(new Rect(0, 0, content.width, content.height), sb.ToString(), style);
-        GUI.EndScrollView();
-    }
-}
+指数EMAで行く：0.5秒 -> 0.707% に例を直す（おすすめ。dt耐性で綺麗）
 
-2) “Unityっぽい”UIでやる: Canvas + TextMeshPro（あなたの既存方式の強化版）
+線形減衰で行く：avg -= avg * 0.5 * dt みたいな “近似” として明記する（おすすめしない。フレームレートでズレる）
 
-メリット: 見た目調整しやすい / スクロール・色分け・フィルタが簡単
-デメリット: UIの用意が必要 / 実装がちょい増える
+「がまん」仕様（b63移植用に整理）
 
-強化ポイントはこれだけ押さえればいい：
+Gaman.md の文章から、実装に落とすとこうなる。
 
-リングバッファ（最新N行）
+1) まず「半減型ミックス平均速度」を持つ（halfLife = 1秒）
 
-LogType別に色分け（Error赤、Warning黄、Log白）
+mixAvgSpeed：半減期1秒のEMAで追跡する平均速度。
 
-トグル表示（F1など）
+InspCore
 
-Development Build限定（本番で出すと恥ずかしい）
+2) 次に「がまんの限界（しきい値）」を計算する
 
-Unityの「よくある汎用デバッグUI」は、だいたいこの方針で作られてる。
+Gaman.md の例はこういう関係を言ってる：
 
-3) さらに実用: “ゲーム内コンソール”方式（コマンド入力 + ログビュー）
+Gaman
 
-メリット: 実運用に強い（QA・デバッグが楽） / 変数いじれる / チートコマンドも統合可
-デメリット: ちゃんと作ると時間が溶ける（いつものUnity）
+Insp=100% → 1回/秒（Mix強度1%なら 1%/s）で爆発
 
-最低限の機能セット:
+Insp=200% → 0.5回/秒（=0.5%/s）で爆発
 
-ログ表示（フィルタ: Log/Warning/Error）
+Insp=50% → 2回/秒（=2%/s）で爆発
 
-検索
+よって、（Mix強度が1%/mixの前提なら）
+限界回数 limitHz = InspLimit / Insp（InspLimit=100%なら、100/Insp%）
+限界速度 limitSpeed = MixStrengthPerMix * limitHz
 
-クリア
+※ MixStrengthPerMix を将来変えるなら、この分離が効く。
 
-コマンド入力（例: god on, spawn cube 10, set timescale 0.2）
+3) 「がまん値」は “限界に対する負荷率A” のEMA（halfLife = 60秒）
 
-オートコンプリート（余裕があれば）
+A = mixAvgSpeed / limitSpeed
 
-この形式、Unity製ゲームでも割と見かける。「~（チルダ）でコンソールが開く」やつ。
+Gaman
 
-4) “いかにも開発者向け”: Stats HUD（FPS/メモリ/ネット/プレイヤー座標）
 
-スクショに出てるやつ（FPSやメモリ、Pingっぽい表示）まさにこれ。
+これを 半減期1分のEMA でならして gamanValue とする。
 
-表示したい定番:
+Gaman
 
-FPS（1/Time.unscaledDeltaTime）
+A > 1 が続くと、1分スケールで gamanValue が 1 を超えていく
 
-フレーム時間
+A < 1 なら、1分スケールで落ち着いて下がる
 
-GC/ヒープ使用量（Profiler系、ただしビルドで制限あり）
+4) 「爆発」の判定
 
-プレイヤー座標
+Gaman.md は “越える” とだけ書いてるので、実装では明示しておくべき：
 
-現在シーン、プレイ状態、サーバー/ロビー情報（今回のEOS/Steamworksっぽい文脈だと超有効）
+gamanValue >= 1.0 でアウト（仮）
 
-ログより“状態”が見えるから、原因切り分けが速い。
+もしくは gamanValue を%表示したいなら >= 100% でアウト
 
-5) UI Toolkit（UITK）で作る（将来寄り）
+旧 Uni_Mxt の「がまん」は参考程度（そのまま移植しないほうが安全）
 
-メリット: 大規模UIに強い / 画面解像度対応しやすい
-デメリット: いまこの瞬間に欲しいなら過剰装備
+旧コードは、Updateで UpdateGaman() と UpdateGamanLimit() を毎フレーム回す構造自体は合ってる。
 
-T-Huntみたいに「ツールとして長く育てる」ならアリ。
+Uni_Mxt_Old
 
-6) 既製品を使って人生を節約する（おすすめ）
 
-“面白い方法”としては、ここが一番コスパいい。
+ただ中身は、がまんを「圧縮・容量」の話に寄せたり、Fkr を足して補正したりで派生が多い。
 
-SRDebugger（有料寄りだけど強い。変数インスペクタ、コンソール、オーバーレイなど）
+Uni_Mxt_Old
 
-In-game Debug Console系（無料/有料いろいろ。ログビュー＋コマンド入力）
 
-Runtime Inspector系（実行中にGameObjectや値を触れる）
+b63は md仕様（EMAと限界比）を正として、旧は「演出や派生パラメータを足したくなった時のネタ帳」扱いが無難。
 
-自作は学びにはなるけど、デバッグUIは育つほど沼。
+構造案（b63向け：仕様を壊さず増やせる形）
 
-実装のコツ（地味に重要）
+今の分離は良いので、Core内だけもう一段“部品化”すると後が楽。
 
-Development Build / Editor のときだけ有効化
+Assets/Script/Core/
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+InspCore.cs（Insp/Mix本体、吸収Tick）
 
-ログ全量を垂れ流さない
+EmaHalfLife.cs（half-life EMAの共通部品）
 
-重要カテゴリだけ（Network/AI/UI/Inputなど）に絞れるようにする
+MixRateTracker.cs（mixAvgSpeed を作る。halfLife=1s）
 
-“チャネル”概念
+GamanCore.cs（limitSpeed, A, gamanValue を作る。halfLife=60s）
 
-DebugBus.Push("Net", "...") みたいに分類して、表示側でフィルタ
+Assets/Script/UI/
 
-スパム防止
+InspPop/（表示と入力。Coreを持つPresenter）
 
-同一メッセージ連打をまとめる（x42 表示）
+GamanPop/（表示だけ。面積＝Gaman値の見せ方を担当）
 
-どれを採用すべきか（結論）
+Gaman
 
-まず成果が欲しい: OnGUIオーバーレイ
+Assets/Script/Core/Debug/
 
-ちゃんと運用したい: Canvas+TMPでログビュー + Stats HUD
+GameDebugOverlay.cs（mixAvgSpeed, limitSpeed, A, gamanValue を表示）
 
-開発チームごっこを始めたい: ゲーム内コンソール + コマンド
+InspCore
 
-時間を守りたい: SRDebugger系の導入
+ドキュメント側は：
 
-ログに埋もれて「何が起きてるんだ…」ってやるより、画面に出して殴ったほうが早い。人類は進歩しないけど、デバッグは進歩できる。
+Main.md に Gaman.md も追加（入口で迷わせない）。
 
+Main
+
+以上。
+
+# Q46 (半減型ミックス平均)
+秒間「平均ミックス速度」を算出します。
+これは実際の平均ではなく、特殊で連続的な平均値です。
+- 平均 1% からミックス無しで1秒経過 -> 0.5%
+- 平均 1% からミックス無しで0.5秒経過 -> 0.75%
+- 平均 0.5% からミックス無しで1秒経過 -> 0.25%
+- 平均 0.5% から毎秒1%ミックスで1秒経過 -> 0.75%
+- 平均 0.5% から毎秒2%ミックスで1秒経過 -> 1.25%
+
+これは伝わりますか？
+上手い表現方法はありますか？
+
+## A46
+伝わる。かなりはっきり伝わる。
+ただし人間語としては不親切で、数式語としてはかなり素直。いつものやつだな。
+
+やってることは「実際の平均」でも「単純な加算」でもなくて、
+現在値を基準にした連続的な指数減衰＋入力加算。
+要するに 一次遅れ系（exponential moving average）に外力を足してる。
+
+正体を一言で言うと
+
+「半減期1秒の指数移動平均に、ミックス速度を外力として加える」
+
+これ。情緒も嘘もない。
+
+数式で書くと（連続時間）
+dA/dt = -k * A + M
+
+
+A : 平均ミックス速度（%）
+
+k : 減衰係数（ここでは ln(2) ≒ 0.693 → 1秒で半減）
+
+M : 毎秒ミックス速度（%/sec）
+
+これで、あなたの例は全部説明がつく。
+
+例が全部この式に一致していることの確認
+① 平均 1% → ミックス無し → 1秒
+A(t) = A0 * e^(-k t)
+1 * e^(-0.693 * 1) = 0.5
+
+
+✔ 0.5%
+
+② 平均 1% → ミックス無し → 0.5秒
+1 * e^(-0.693 * 0.5) ≒ 0.707
+
+
+あなたの 0.75% は離散ステップ前提なら妥当。
+設計的には「1秒半減」を感覚優先で丸めてるだけ。
+
+③ 平均 0.5% → ミックス無し → 1秒
+0.5 * 0.5 = 0.25
+
+
+✔
+
+④ 平均 0.5% → 毎秒1% → 1秒
+A(1) = A0*e^-k + (M/k)*(1 - e^-k)
+
+
+数値入れると ≒ 0.75
+✔
+
+⑤ 平均 0.5% → 毎秒2% → 1秒
+
+同上で ≒ 1.25
+✔
+
+つまり 全部「指数減衰＋定常入力」の教科書通り。
+
+上手い表現方法（用途別）
+1️⃣ 仕様書・コードコメント向け（最強）
+
+半減期1秒の指数移動平均によるミックス速度評価
+現在値は時間経過で指数的に減衰し、
+毎秒ミックス量を外力として加算する。
+
+これで通じない相手は、読まなくていい。
+
+2️⃣ 人間向け（UI・説明文）
+
+ミックス速度は「最近の傾向」を強く反映します。
+ミックスしないと自然に減衰し、
+強く混ぜ続けると平均値が押し上げられます。
+
+感覚的。嘘は言ってない。
+
+3️⃣ 数式を避けたいけど正確に言いたい場合
+
+「1秒で半分忘れる平均値」
+直近のミックスほど影響が強く、
+過去の値は時間とともに薄れていく。
+
+これはかなり良い。覚えやすい。
+
+名前を付けるなら
+
+もう決めていい。
+
+Exponential Mix Average
+
+Half-life Mix Average
+
+Continuous Mix Momentum
+
+減衰型ミックス平均（和製）
+
+個人的には
+「半減型ミックス平均」
+このプロジェクトに一番似合ってる。
+
+まとめると
+
+伝わっている
+
+やっていることは数学的に綺麗
+
+表現が悪いだけ
+
+中身は一次遅れ系という、極めて大人の設計
+
+安心してそのまま進め。これは「わかってる人の式」だ。
+
+# CQ45
+リポジトリのレビューを行ってください。
+
+## CA45
+【北船#27】レビュー結果です…（指摘→質問→補足の順です）
+
+Findings
+
+高: GameDebug の静的データがプレイ再開で残留する恐れがあり、Enter Play Mode Options でドメインリロード無効だと古いキー/値が残り誤表示になります。GameDebugOverlay.cs (line 5) GameDebugOverlay.cs (line 7)
+中: GameDebug.Keys は内部 List の生参照で、OnGUI の列挙中に別スクリプトが Set で新規キー追加すると InvalidOperationException になる可能性があります。GameDebugOverlay.cs (line 20) GameDebugOverlay.cs (line 55)
+低: InspPopPresenter の _logTimer と _movedSinceLastLog が更新されるだけで未使用です。意図したログ処理が抜けているなら挙動差、不要なら削除候補です。InspPopPresenter.cs (line 14) InspPopPresenter.cs (line 41)
+低: InspPopView.OnEnable が baseScale 設定に関係なく localScale=0 を強制し、baseScale を使いたい場合は一瞬 0 から始まります。仕様ならOKですが挙動の意図確認が必要です。InspPopView.cs (line 14)
+Questions / Assumptions
+
+Enter Play Mode Options でドメインリロード無効を想定していますか…？（デバッグ表示の残留対策の要否）
+baseScale は「初期サイズ」にも反映させたいですか…？（OnEnable の強制ゼロは仕様か）
+Notes
+
+自動テストは見当たりませんでした。Unity の手動検証のみ前提なら、Insp/Mix の数値変化が正しく追える手順の明文化があると安心です。
+補足
+
+指示により THunt-Dev/ 配下の編集は禁止のため、Chat.md への追記は行っていません…（また、この環境は read-only です）
+必要なら、改善案のパッチ提案まで具体化します。次の一歩の候補です:
+
+GameDebug にクリア処理（再生開始時の初期化）を追加する
+GameDebug の列挙を ToArray() などでスナップショット化する
+InspPopPresenter のログ系フィールドを実装するか削除する
 
 # End Of File
