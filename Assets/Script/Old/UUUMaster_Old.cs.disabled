@@ -1,0 +1,1600 @@
+using Newtonsoft.Json.Bson;
+using static UUUFileIO;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using TMPro;
+using UnityEngine;
+using UnityEngine.Purchasing;
+using UnityEngine.UI; //Text用
+
+using Random = UnityEngine.Random;
+using System.Text;
+using UnityEngine.Rendering;
+using UnityEngine.SocialPlatforms.Impl;
+
+public class UUUMaster : MonoBehaviour
+{
+    public UUUMixController mixController;
+    public UUUInputController inputController;
+
+    DTimeChecker DTimeChecker;      // クラス毎にdTimeを取得すること
+    public float dTime;             // Time.DeltaTime代替用
+    public float IngameTime;        // ゲーム内時間（トレース用）
+    public bool ModeTrace;          // トレースモード
+    public bool Flag_FrameAdv;      // コマ送りフラグ
+    float frameTime;                // 秒間60フレームとした場合の時間（トレース用）
+
+    // 試行錯誤用テストコード
+    public string TestCode;
+    public string TestString;
+    // "Kurimanju" : 通常バージョン
+    // "Manjutane" : インスピ派生値のテスト
+    public bool TestCode_Tamekomi;  // "Tamekomi" : ためこみ値実装
+
+    public Camera Camera;       // カメラ情報
+    public string FileIOString;     // ファイル入出力用トレース
+
+    //public Text ProdInfo;               // 生産物情報
+    public Text ProdText;           // 生産物情報
+    public GameObject DebugInfo;
+    public Text DebugText;             // ここにキャンバス用のUIを割り当てる Canvas->UI
+    public GameObject DebugInfo2;
+    public Text DebugText2;           // デバッグテキスト2ページ目
+    public string[,] DTArray;          // デバッグ用テキスト配列（どこからでも自由に割り当てる）
+    public int DTPage;              // デバッグテキスト用ページ（100ページあるけどそれでも足りないかも）
+
+    // public Uni_Mxt Mixture;         // うにおんの持ってるミクスチャ
+    // public Uni_Mxt mt;              // 短縮版
+    // public SpriteRenderer Sprite;   // うにおんのスプライト
+    // public Gokou Gokou;
+
+    public string BuildVersion;         // ビルドバージョン（ファイル入出力用）
+
+    DateTime uuuDateTime;               // うにおん世界の時計を実世界と連動させる
+    public float Mood;                  // ムード（夜にミクスチャ強度増加）
+    public Color OrgMoodColor;          // カメラ背景色
+    public double TestTime;             // テスト用時間
+
+    public Union TargetUnion;             // 操作中のうにおん
+    public Union tu;                      // その短縮形
+
+    //public int manual_automix;          // マニュアル自動ミックス（色気づきではない自動ミックス）
+    //public float manual_automix_time;   // マニュアル自動ミックス間隔
+
+    // public int automix;                 // 自動ミックス
+    // public int manual_automix;          // マニュアル自動ミックス（色気づきではない自動ミックス）
+    // public int irk;                     // 色気づき状態（強制自動インスピ）
+    // public float irk_automix_time;      // 色気づき状態の自動ミックス間隔
+    // private float ms_LastInsp;
+
+    // public int mix_state;                  // b60で廃止
+    public int Mix_keydown { get; set; }      // ミックスキー押下状態（廃止予定）
+    // private int mix_keydown_b;             // b60で廃止
+
+    public int automix;                 // 自動ミックス
+    public int manual_automix;          // マニュアル自動ミックス（色気づきではない自動ミックス）
+    public float manual_automix_time;   // マニュアル自動ミックス間隔
+                                        // public int gaman_state;             // 0 : 普通, 1 : がまん, 2 : ふんばり, 3 : バクハツ
+                                        // public int funbari_state;           // 0 : 普通, 1 : こみあげ, 2 : ふんばり
+
+    // フレーバー関連
+    // public Fl_List Fl;                  // フレーバーリスト
+
+    // public GameObject Flavor_Pos;
+    // public GameObject Flavor_Pos_1;
+    // public GameObject Flavor_Pos_2;
+
+    public GameObject Flavor;            // フレーバー
+    public GameObject FlavorDoorKeyhole; // 鍵穴つき扉（フレーバー）  
+    public GameObject FlavorWarn;        // 警告チュートリアル
+    //public GameObject FlavorThink;     // 考えるフレーバー
+    public Flavor FlavorThink;           // 考えるフレーバー
+    public Flavor FlavorLook;            // 見るフレーバー
+    public Flavor FlavorKuripon;         // くりぽん（フレーバー） 
+    public Flavor FlavorPippi;           // ピッピ（フレーバー）
+    public float TimetoSpawnFlavor;      // フレーバー出現時間
+
+    // 生産物関連
+    // public int[] ProductItems;          // 生産アイテム（ホイップ、モチなど） 
+    // public double ProductHeart;         // 非アイテム生産量（ハートと定義）
+    public GameObject Prod_ElmK_Org;
+    public GameObject Prod_Moti_Org;
+    public GameObject Prod_Whip_Org;
+    public GameObject Prod_Syrup_Org;
+    //public int ProductFlavor_Num;       // 生産物フレーバー数
+    //public GameObject[] ProductFlavors; // 産みたての生産物はフレーバーになる
+    //public List<GameObject> ProductFlavors;    // 産みたての生産物はフレーバーになる
+
+    public GameObject ProdPopOrg;       // 生産ポッププレハブ割り当て用
+
+    // 効果音関連
+    public AudioSource Sound01;
+    public AudioSource Sound01_a;
+    public AudioSource Sound01_b;
+    public AudioSource Sound02;
+    public AudioSource Sound02_a;
+    public AudioSource Sound02_b;
+
+    // b53で追加された実験的効果音
+    public AudioSource Sound03_a1;
+    public AudioSource Sound03_a2;
+    public AudioSource Sound03_a3;
+    public AudioSource Sound03_a4;
+
+    public AudioSource SEProduction;      // 生産音
+    public AudioSource SEProduction2;     // 生産音2
+    public AudioSource SEProduction3;     // 生産音3
+    public AudioSource SEProduction4;     // 生産音4
+
+    public AudioSource BGMKomiage;        // bgm
+    public AudioSource BGMFunbari;        // bgm
+
+    public AudioSource SEScore;           // スコアリザルト音
+    public AudioSource SEManzoku;         // うにおん満足の雄たけび
+    public AudioSource SEGakkari;         // うにおんのがっかり
+
+    public float DefVolume_Sound01;
+    public float DefVolume_Sound01_a;
+    public float DefVolume_Sound01_b;
+    public float DefVolume_Sound02;
+    public float DefVolume_Sound02_a;
+    public float DefVolume_Sound02_b;
+
+    public float DefVolume_Sound03;
+    public float DefVolume_BGMFunbari;     // フェードアウト用
+
+    public AudioSource Endure;
+    public AudioSource FlavorSpawn;     // フレーバー出現音
+
+
+    //public Animator TamaranTextAnim;
+    //public Animator TamaranTextAnimBody;
+    //public Animator TamaranTextAnimSmall;
+    //public Animator TamaranTextAnimPer;
+
+    // Use this for initialization
+    void Start()
+    {
+        // ==== MixController & InputController 初期化 ====
+        mixController = new UUUMixController(this);
+        inputController = new UUUInputController(this, tu);
+
+        InitBasic();
+        InitParam();
+        InitSound();
+    }
+    void InitBasic()
+    {
+        DTimeChecker = new();
+        IngameTime = 0;
+        ModeTrace = false;
+        Flag_FrameAdv = false;
+
+        TestCode = "Kurimanju";
+        BuildVersion = UUUFileBuildVersion.str;
+        // ファイル形式が変化したら、UUUFileIO.csでバージョンを変更する
+
+        //DebugText = DebugInfo.GetComponent<Text>();
+        //DebugText2 = DebugInfo2.GetComponent<Text>();
+        DTArray = new string[100, 100];
+        DTPage = 0;
+    }
+    void InitParam()
+    {
+        automix = 0;
+        manual_automix = 0;
+
+        // irk = 0;
+        // irk_automix_time = 5.0f;
+        frameTime = 0;
+        manual_automix_time = 1.0f;
+        // automix_time = manual_automix_time = 1.0f;
+        // mix_state = 0;
+        // gaman_state = 0;
+        // funbari_state = 0;
+
+        // Fl_List_Construct();
+        TimetoSpawnFlavor = 1.0f;                            // 300.0f + 180 * Random.value;    // フレーバー出現時間（5m - 8m）
+
+        // ProdPops = new List<GameObject>();                   // 生産ポップ配列初期化
+        // ProductItems = new int[50];                          // シロップ９種、ホイップ９種、モチ９種、その他予備
+        // for (int i = 0; i < 50; i++) ProductItems[i] = 0;
+
+        Mood = 0;
+        OrgMoodColor = Camera.backgroundColor;
+        TestTime = 0;
+    }
+    void InitSound()
+    {
+        DefVolume_Sound01 = Sound01.volume;
+        DefVolume_Sound01_a = Sound01_a.volume;
+        DefVolume_Sound01_b = Sound01_b.volume;
+        DefVolume_Sound02 = Sound02.volume;
+        DefVolume_Sound02_a = Sound02_a.volume;
+        DefVolume_Sound02_b = Sound02_b.volume;
+
+        DefVolume_Sound03 = Sound03_a1.volume;
+        DefVolume_BGMFunbari = BGMFunbari.volume;
+    }
+
+#if b59
+    // 仮処理
+    // ソースコード変更でListが消滅した場合用
+    public void Fl_List_Construct()
+    {
+        Fl = new Fl_List();
+        Fl.Union = this.TargetUnion;
+    }
+#endif
+
+    // Update is called once per frame
+    void Update()
+    {
+
+        UpdateInit();
+
+        UpdateProductInfo();
+        // UpdateProdAmount();
+        UpdateMood();
+
+        inputController.UpdateInputs();
+
+        // ==== MixController 入力処理 ====
+        // Fire2 押下状態を MixController に伝える
+        float t = IngameTime;
+
+        // ↓ ここが重要ポイント：MixController にパラメータ更新
+        mixController.currentManualAutoMixTime = manual_automix_time;
+        mixController.currentIrkAutoMixTime = tu.irk_automix_time;
+
+        // irk 値を毎フレーム渡す（Master 内で計算しているなら）
+        mixController.currentIrk = tu.irk;
+
+        if (Mix_keydown == 1)
+        {
+            mixController.OnMixPress(t);
+        }
+        else
+        {
+            mixController.OnMixRelease(t);
+        }
+
+        // ==== MixController 毎フレーム更新 ====
+        mixController.Update(t);
+
+#if Disabled_in_b59
+        // ■ファイル入出力(b52)
+        // ステートセーブとしてShift - F1-F10でデータセーブ
+        // F1-F10でデータを読み込む
+        bool isShift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift); ;       // シフト入力
+        bool isWrite = false;       // 書き込みフラグ 
+        int nData = 0;              // データ番号 
+        if (Input.GetKeyDown(KeyCode.F1)) nData = 1;
+        if (Input.GetKeyDown(KeyCode.F2)) nData = 2;
+        if (Input.GetKeyDown(KeyCode.F3)) nData = 3;
+        if (Input.GetKeyDown(KeyCode.F4)) nData = 4;
+        if (Input.GetKeyDown(KeyCode.F5)) nData = 5;
+        if (Input.GetKeyDown(KeyCode.F6)) nData = 6;
+        if (Input.GetKeyDown(KeyCode.F7)) nData = 7;
+        if (Input.GetKeyDown(KeyCode.F8)) nData = 8;
+        if (Input.GetKeyDown(KeyCode.F9)) nData = 9;
+        if (Input.GetKeyDown(KeyCode.F10)) nData = 10;
+
+        if (isShift)
+        {
+            isWrite = true;
+        }
+
+        // ファイル入出力
+        if (nData != 0)
+        {
+            if (isWrite)
+            {
+                // 書き込みモードでアクセス
+                AccessStateData(nData, "w");
+            }
+            else
+            {
+                // 読み込みモードでアクセス
+                AccessStateData(nData, "r");
+            }
+        }
+
+        // インスピレーション自動化はInspirationで行うべきか
+        if (Input.GetKeyDown("q"))  // オートインスピレーションキー(Qキー)
+        {
+            if (manual_automix == 0)
+            {
+                manual_automix = 1;
+                tu.AutoMix_Start();
+                //StartCoroutine("Inspiration");
+            }
+            else
+            {
+                manual_automix = 0;
+                tu.AutoMix_Stop();
+                //Anm_Union.ResetTrigger("Inspiration");
+                //Anm_Union.SetTrigger("Insp_return");
+                //StopCoroutine("Inspiration");
+            }
+        }
+
+        // オートインスピレーションキー(Qキー)
+        // がまんキー(Enter)
+        // デバッグ用Iroduki調整(U)Mixture.Iroduki = 50
+        // デバッグ用InspLimit調整(I)Mixture.Insp_Limit = 50
+        // デバッグ用Iroduki調整(K)Mixture.Iroduki = 50
+        // デバッグ用Insp調整(L)Mixture.Insp = 5
+        // デバッグ用Funbari調整(;)Mixture.Funbari = 0
+        // ミクスチャキー(左クリック)
+        if (TestCode == "Manjutane")
+        {
+            if (Input.GetButtonDown("Fire2"))  // がまんキー(右クリック)
+            {
+                tu.mt.Endure(0.5f);
+                Endure.Play();
+            }
+        }
+        if (Input.GetKeyDown("g"))  // フレーバー切り替え
+        {
+            if (tu.Fl.list == null)
+            {
+                FlavorSpawn.Play();
+            }
+            if (tu.Fl.list.Count == 0)
+            {
+                FlavorSpawn.Play();
+                tu.Fl.SetFlavor("Kuripon");
+            }
+            else
+            {
+                FlavorSpawn.Play();
+                if (tu.Fl.list[0].Type == "Kuripon")
+                {
+                    tu.Fl.DestroyFlavor(tu.Fl.list[0]);
+                    tu.Fl.SetFlavor("Pippi");
+                }
+                else
+                {
+                    tu.Fl.DestroyFlavor(tu.Fl.list[0]);
+                }
+            }
+        }
+        if (Input.GetKeyDown("t"))  // トレースモード切替(T)
+        {
+            if (!ModeTrace)
+            {
+                ModeTrace = true;
+            }
+            else
+            {
+                ModeTrace = false;
+            }
+        }
+        if (Input.GetKeyDown("y"))  // トレース用コマ送り(Y)
+        {
+            dTime = 1.0f / 60;
+            IngameTime += dTime;
+        }
+        if (Input.GetKeyDown("u"))  // デバッグ用Tamekomi調整(U)
+        {
+            tu.mt.Tamekomi = tu.mt.RateToTamekomi(100);
+        }
+        if (Input.GetKeyDown("i"))  // デバッグ用InspLimit調整(I)
+        {
+            tu.mt.Insp_Limit = 50;
+        }
+        if (Input.GetKeyDown("k"))  // デバッグ用がまんレベル調整(K)
+        {
+            tu.mt.Product += tu.mt.Product * 0.1f;
+        }
+        if (Input.GetKeyDown("l"))  // デバッグ用がまんレベル調整(L)
+        {
+            tu.mt.Product -= tu.mt.Product * 0.1f;
+        }
+        if (Input.GetKeyDown("o"))  // デバッグ用Iroduki調整(O)
+        {
+            tu.mt.Insp += tu.mt.RateToInsp(1);
+        }
+        if (Input.GetKeyDown("p"))  // デバッグ用Iroduki調整(P)
+        {
+            tu.mt.Insp -= tu.mt.RateToInsp(1);
+        }
+        if (Input.GetKeyDown(KeyCode.Comma))  // 自動インスピレーション間隔(<)
+        {
+            manual_automix_time /= 1.05f;
+        }
+        if (Input.GetKeyDown(KeyCode.Period))  // 自動インスピレーション間隔(>)
+        {
+            manual_automix_time *= 1.05f;
+        }
+        if (Input.GetKeyDown(KeyCode.Semicolon))  // デバッグ用Funbari調整(;) ※セミコロンのはずが、バグでEqualsになってる？
+        {
+            tu.mt.Sukkiri = 0;
+        }
+        if (Input.GetKeyDown("space"))  // ミクスチャ非表示切り替え
+        {
+            tu.mt.ui.Visible = !tu.mt.ui.Visible;
+        }
+
+        // デバッグ表示切替
+        // ①デバッグ情報1(ミクスチャ情報), ②:デバッグ情報2, ③生産物情報
+        // スラッシュとバックスラッシュ
+        // キーコードがどこにも載っていないので
+        // このデバッグ機能で取得したキーコード161を使用する
+        if (Input.GetKeyDown(KeyCode.Slash))  // 後方切り替え
+        {
+            if (DebugText.enabled)
+            {
+                ProdText.enabled = true;
+                DebugText.enabled = false;
+            }
+            else if (DebugText2.enabled)
+            {
+                if (DTPage <= 0)
+                {
+                    DebugText.enabled = true;
+                    DebugText2.enabled = false;
+                }
+                else DTPage--;
+            }
+            else if (ProdText.enabled)
+            {
+                DebugText2.enabled = true;
+                DTPage = 99;
+                ProdText.enabled = false;
+            }
+            else DebugText.enabled = true;
+        }
+        if (Input.GetKeyDown((KeyCode)161))  // 前方切り替え
+        {
+            if (DebugText.enabled)
+            {
+                DebugText.enabled = false;
+                DebugText2.enabled = true;
+                DTPage = 0;
+            }
+            else if (DebugText2.enabled)
+            {
+                if (DTPage >= 99)
+                {
+                    DebugText2.enabled = false;
+                    ProdText.enabled = true;
+                }
+                else DTPage++;
+
+            }
+            else if (ProdText.enabled)
+            {
+                ProdText.enabled = false;
+                DebugText.enabled = true;
+            }
+            else DebugText.enabled = true;
+        }
+
+        int i;
+        for (i = 0; i <= 400; i++)
+        {
+            if (Input.GetKeyDown((KeyCode)i))
+            {
+                DTArray[0, 0] = "入力されたキーのキーコードだよ！ : " + i.ToString();
+            }
+        }
+
+        if (Input.GetButtonDown("Fire2")) // ミックスキー(左クリック)
+        //if (Input.GetButtonDown("return")) // ガス抜き（ミクスチャ）: エンターキー
+        {
+            Mix_keydown = 1;
+        }
+        else if (Input.GetButtonUp("Fire2"))
+        {
+            Mix_keydown = 0;
+        }
+#endif
+
+#if Disabled_in_b59
+        // ■ファイル入出力(b52)
+        // ステートセーブとしてShift - F1-F10でデータセーブ
+        // F1-F10でデータを読み込む
+        bool isShift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift); ;       // シフト入力
+        bool isWrite = false;       // 書き込みフラグ 
+        int nData = 0;              // データ番号 
+        if (Input.GetKeyDown(KeyCode.F1)) nData = 1;
+        if (Input.GetKeyDown(KeyCode.F2)) nData = 2;
+        if (Input.GetKeyDown(KeyCode.F3)) nData = 3;
+        if (Input.GetKeyDown(KeyCode.F4)) nData = 4;
+        if (Input.GetKeyDown(KeyCode.F5)) nData = 5;
+        if (Input.GetKeyDown(KeyCode.F6)) nData = 6;
+        if (Input.GetKeyDown(KeyCode.F7)) nData = 7;
+        if (Input.GetKeyDown(KeyCode.F8)) nData = 8;
+        if (Input.GetKeyDown(KeyCode.F9)) nData = 9;
+        if (Input.GetKeyDown(KeyCode.F10)) nData = 10;
+
+        if (isShift)
+        {
+            isWrite = true;
+        }
+
+        // ファイル入出力
+        if (nData != 0)
+        {
+            if (isWrite)
+            {
+                // 書き込みモードでアクセス
+                AccessStateData(nData, "w");
+            }
+            else
+            {
+                // 読み込みモードでアクセス
+                AccessStateData(nData, "r");
+            }
+        }
+
+        // インスピレーション自動化はInspirationで行うべきか
+        if (Input.GetKeyDown("q"))  // オートインスピレーションキー(Qキー)
+        {
+            if (manual_automix == 0)
+            {
+                manual_automix = 1;
+                tu.AutoMix_Start();
+                //StartCoroutine("Inspiration");
+            }
+            else
+            {
+                manual_automix = 0;
+                tu.AutoMix_Stop();
+                //Anm_Union.ResetTrigger("Inspiration");
+                //Anm_Union.SetTrigger("Insp_return");
+                //StopCoroutine("Inspiration");
+            }
+        }
+
+        // オートインスピレーションキー(Qキー)
+        // がまんキー(Enter)
+        // デバッグ用Iroduki調整(U)Mixture.Iroduki = 50
+        // デバッグ用InspLimit調整(I)Mixture.Insp_Limit = 50
+        // デバッグ用Iroduki調整(K)Mixture.Iroduki = 50
+        // デバッグ用Insp調整(L)Mixture.Insp = 5
+        // デバッグ用Funbari調整(;)Mixture.Funbari = 0
+        // ミクスチャキー(左クリック)
+        if (TestCode == "Manjutane")
+        {
+            if (Input.GetButtonDown("Fire2"))  // がまんキー(右クリック)
+            {
+                tu.mt.Endure(0.5f);
+                Endure.Play();
+            }
+        }
+        if (Input.GetKeyDown("g"))  // フレーバー切り替え
+        {
+            if (tu.Fl.list == null)
+            {
+                FlavorSpawn.Play();
+            }
+            if (tu.Fl.list.Count == 0)
+            {
+                FlavorSpawn.Play();
+                tu.Fl.SetFlavor("Kuripon");
+            }
+            else
+            {
+                FlavorSpawn.Play();
+                if (tu.Fl.list[0].Type == "Kuripon")
+                {
+                    tu.Fl.DestroyFlavor(tu.Fl.list[0]);
+                    tu.Fl.SetFlavor("Pippi");
+                }
+                else
+                {
+                    tu.Fl.DestroyFlavor(tu.Fl.list[0]);
+                }
+            }
+        }
+        if (Input.GetKeyDown("t"))  // トレースモード切替(T)
+        {
+            if (!ModeTrace)
+            {
+                ModeTrace = true;
+            }
+            else
+            {
+                ModeTrace = false;
+            }
+        }
+        if (Input.GetKeyDown("y"))  // トレース用コマ送り(Y)
+        {
+            dTime = 1.0f / 60;
+            IngameTime += dTime;
+        }
+        if (Input.GetKeyDown("u"))  // デバッグ用Tamekomi調整(U)
+        {
+            tu.mt.Tamekomi = tu.mt.RateToTamekomi(100);
+        }
+        if (Input.GetKeyDown("i"))  // デバッグ用InspLimit調整(I)
+        {
+            tu.mt.Insp_Limit = 50;
+        }
+        if (Input.GetKeyDown("k"))  // デバッグ用がまんレベル調整(K)
+        {
+            tu.mt.Product += tu.mt.Product * 0.1f;
+        }
+        if (Input.GetKeyDown("l"))  // デバッグ用がまんレベル調整(L)
+        {
+            tu.mt.Product -= tu.mt.Product * 0.1f;
+        }
+        if (Input.GetKeyDown("o"))  // デバッグ用Iroduki調整(O)
+        {
+            tu.mt.Insp += tu.mt.RateToInsp(1);
+        }
+        if (Input.GetKeyDown("p"))  // デバッグ用Iroduki調整(P)
+        {
+            tu.mt.Insp -= tu.mt.RateToInsp(1);
+        }
+        if (Input.GetKeyDown(KeyCode.Comma))  // 自動インスピレーション間隔(<)
+        {
+            manual_automix_time /= 1.05f;
+        }
+        if (Input.GetKeyDown(KeyCode.Period))  // 自動インスピレーション間隔(>)
+        {
+            manual_automix_time *= 1.05f;
+        }
+        if (Input.GetKeyDown(KeyCode.Semicolon))  // デバッグ用Funbari調整(;) ※セミコロンのはずが、バグでEqualsになってる？
+        {
+            tu.mt.Sukkiri = 0;
+        }
+        if (Input.GetKeyDown("space"))  // ミクスチャ非表示切り替え
+        {
+            tu.mt.ui.Visible = !tu.mt.ui.Visible;
+        }
+
+        // デバッグ表示切替
+        // ①デバッグ情報1(ミクスチャ情報), ②:デバッグ情報2, ③生産物情報
+        // スラッシュとバックスラッシュ
+        // キーコードがどこにも載っていないので
+        // このデバッグ機能で取得したキーコード161を使用する
+        if (Input.GetKeyDown(KeyCode.Slash))  // 後方切り替え
+        {
+            if (DebugText.enabled)
+            {
+                ProdText.enabled = true;
+                DebugText.enabled = false;
+            }
+            else if (DebugText2.enabled)
+            {
+                if (DTPage <= 0)
+                {
+                    DebugText.enabled = true;
+                    DebugText2.enabled = false;
+                }
+                else DTPage--;
+            }
+            else if (ProdText.enabled)
+            {
+                DebugText2.enabled = true;
+                DTPage = 99;
+                ProdText.enabled = false;
+            }
+            else DebugText.enabled = true;
+        }
+        if (Input.GetKeyDown((KeyCode)161))  // 前方切り替え
+        {
+            if (DebugText.enabled)
+            {
+                DebugText.enabled = false;
+                DebugText2.enabled = true;
+                DTPage = 0;
+            }
+            else if (DebugText2.enabled)
+            {
+                if (DTPage >= 99)
+                {
+                    DebugText2.enabled = false;
+                    ProdText.enabled = true;
+                }
+                else DTPage++;
+
+            }
+            else if (ProdText.enabled)
+            {
+                ProdText.enabled = false;
+                DebugText.enabled = true;
+            }
+            else DebugText.enabled = true;
+        }
+
+        int i;
+        for (i = 0; i <= 400; i++)
+        {
+            if (Input.GetKeyDown((KeyCode)i))
+            {
+                DTArray[0, 0] = "入力されたキーのキーコードだよ！ : " + i.ToString();
+            }
+        }
+
+        if (Input.GetButtonDown("Fire2")) // ミックスキー(左クリック)
+        //if (Input.GetButtonDown("return")) // ガス抜き（ミクスチャ）: エンターキー
+        {
+            Mix_keydown = 1;
+        }
+        else if (Input.GetButtonUp("Fire2"))
+        {
+            Mix_keydown = 0;
+        }
+#endif
+
+#if Disabled_in_b59
+        if (false)
+        {
+            if (mix_keydown_m == 1 && mix_keydown == 0)
+            {
+                // 
+                {
+                    StopCoroutine("Inspiration");
+                    manual_automix = 0;
+                    automix = 0;
+                    mix_keydown = 1;
+                    Anm_Union.ResetTrigger("Insp_return");
+                    Anm_Union.ResetTrigger("Insp_idle");
+                    Anm_Union.SetTrigger("Inspiration");
+                    mt.ui.UI_ResetTrigger("Insp_idle");
+                    mt.ui.UI_SetTrigger("Inspiration");
+                    if (mix_state == 0)
+                    {
+                        //GetComponents<AudioSource>()[0].Play();
+                        int r = Random.Range(1, 5);
+                        if (r == 1) Sound03_a1.Play();
+                        if (r == 2) Sound03_a2.Play();
+                        if (r == 3) Sound03_a3.Play();
+                        if (r == 4) Sound03_a4.Play();
+
+                        // r = Random.Range(1, 4);
+                        //if (r == 1) Sound01.Play();
+                        //if (r == 2) Sound01_a.Play();
+                        //if (r == 3) Sound01_b.Play();
+                        mix_state = 1; // ここで押し付けた状態になる
+                        Mixture.DoMix();
+                        ms_LastInsp = IngameTime;
+                    }
+                }
+            }
+            // 条件が複雑
+            // オートインスピ解除後のインスピ解除用
+            else if (mix_keydown_m == 0 &&
+                (mix_keydown == 1 || (automix == 0 && ms_LastInsp < IngameTime - 0.3)))
+            {
+                mix_keydown = 0;
+                Anm_Union.SetTrigger("Insp_return");
+                Anm_Union.ResetTrigger("Inspiration");
+                mt.ui.UI_ResetTrigger("Insp_idle");
+                mt.ui.UI_SetTrigger("Inspiration");
+                if (mix_state == 1)
+                {
+                    //AudioSource[] audios = GetComponents<AudioSource>();
+                    // 
+                    int r = Random.Range(1, 4);
+                    if (r == 1) Sound02.Play();
+                    if (r == 2) Sound02_a.Play();
+                    if (r == 3) Sound02_b.Play();
+                    mix_state = 0;
+                    Mixture.DoMix(); // ここでミクスチャを刺激する
+                    ms_LastInsp = IngameTime;
+                }
+            }
+            // 条件が複雑
+            // オートインスピ解除後のインスピ解除用（中止）
+            if (automix == 0 &&
+                (mix_state == 0 /*|| mix_keydown == 0*/) &&
+                ms_LastInsp < IngameTime - 1)
+            {
+                Anm_Union.SetTrigger("Insp_return");
+                Anm_Union.SetTrigger("Insp_idle");
+                mt.ui.UI_ResetTrigger("Inspiration");
+                mt.ui.UI_SetTrigger("Insp_idle");
+            }
+        }
+#endif
+
+#if Disabled_in_b59
+        //********************************************
+        // ふんばり状態
+        // ステージ2 : はきこみ率10%越え and こみあげ状態
+        //             （スコア0の時を除く）
+        // ステージ1 : がまんステージ4 and ふんばりステージ3に達していない
+        // ステージ0 : がまんステージ4に達していない
+
+        /*if ((Mixture.Haki_Komi >= Mixture.Insp_Limit * 0.1f
+            || Mixture.Haki >= Mixture.Insp_Limit * 0.1f)
+            && Mixture.Komiage >= 0.00001f
+            && Mixture.Score != 0)*/
+        if (mt.Insp < mt.InspMinus)
+        {
+            if (funbari_state != 2)
+            {
+                BGMFunbari.volume = DefVolume_BGMFunbari;
+                Komiage_Start(false);
+                Funbari_Start(true);
+                funbari_state = 2;
+            }
+        }
+#endif
+
+#if Disabled_in_b59
+        // 一度バクハツ状態になったら
+        // リザルトまで戻らない
+        // スコア停止中なので条件分岐も中止
+        // if (funbari_state != 2)
+
+        // その変わり条件を満たさなくなったら
+        // 状態を戻す
+        if (!(mt.Insp < mt.InspMinus))
+        {
+            if (gaman_state >= 4)
+            {
+                if (funbari_state != 1)
+                {
+                    Funbari_Start(false);
+                    Komiage_Start(true);
+                    funbari_state = 1;
+                }
+            }
+            else
+            {
+                if (funbari_state != 0)
+                {
+                    Komiage_Start(false);
+                    funbari_state = 0;
+                }
+            }
+        }
+#endif
+
+#if Disabled_in_b59
+        // スコア停止中なので条件分岐も中止
+        //if (funbari_state == 0)
+        {
+            BGMFunbari.volume = DefVolume_BGMFunbari * (float)(mt.Sukkiri_Rate() * mt.Insp_Rate(mt.Insp));
+        }
+        // すっきり値でフェードアウトする
+#endif
+
+#if Disabled_in_b59
+        //********************************************
+        // がまん状態
+        // ステージ5 : 生産物が色づきの2%で生産状態
+        // ステージ4 : こみ上げ値が2%でバクハツ状態
+        // ステージ3 : インスピ2値90% or たまらん値50%
+        // ステージ2 : インスピ1値80% or インスピ2値20%
+        // ステージ1 : インスピ0値50% or インスピ1値10%
+        if (Mixture.dProduct / Mixture.Iroduki_Limit > 0.02f)
+        {
+            if (gaman_state != 5)
+            {
+                Anm_Union.SetInteger("Gaman_State", 5);
+                Anm_Union.SetTrigger("Gaman_State_Changed");
+                gaman_state = 5;
+            }
+        }
+        else if (Mixture.Komiage / Mixture.Insp_Limit > 0.02f)
+        {
+            if (gaman_state != 4)
+            {
+                Anm_Union.SetInteger("Gaman_State", 4);
+                Anm_Union.SetTrigger("Gaman_State_Changed");
+                gaman_state = 4;
+            }
+        }
+        else if (Mixture.Insp_Rate(Mixture.Insp3Volume()) > 0.5f)
+        // (Mixture.Insp_Rate(Mixture.Tamaran) > 0.9f)
+        //|| Mixture.Insp_Rate(Mixture.Insp3) >= 0.5f)
+        //else if (Mixture.Iroduki / Mixture.Iroduki_Limit > 0.5f
+        //    || Mixture.Insp / Mixture.Insp_Limit > 0.8f
+        //    || Mixture.Komiage / Mixture.Insp_Limit > 0.01f)
+        {
+            if (gaman_state != 3)
+            {
+                Anm_Union.SetInteger("Gaman_State", 3);
+                Anm_Union.SetTrigger("Gaman_State_Changed");
+                gaman_state = 3;
+            }
+        }
+        else if (Mixture.Insp_Rate(Mixture.Insp2Volume()) > 0.5f)
+        // (Mixture.Insp_Rate(Mixture.Taraman) > 0.8f)
+        //|| Mixture.Insp_Rate(Mixture.Insp2) >= 0.2f)
+        //else if (Mixture.Iroduki / Mixture.Iroduki_Limit > 0.5f
+        //    || Mixture.Insp / Mixture.Insp_Limit > 0.8f
+        //    || Mixture.Komiage / Mixture.Insp_Limit > 0.01f)
+        {
+            if (gaman_state != 2)
+            {
+                Anm_Union.SetInteger("Gaman_State", 2);
+                Anm_Union.SetTrigger("Gaman_State_Changed");
+                gaman_state = 2;
+            }
+        }
+        else if (Mixture.Insp_Rate(Mixture.InspVolume()) > 0.5f)
+        // (Mixture.Insp_Rate(Mixture.Tamaran) > 0.5f)
+        //|| Mixture.Insp_Rate(Mixture.Insp1) >= 0.1f)
+        {
+            if (gaman_state != 1)
+            {
+                Anm_Union.SetInteger("Gaman_State", 1);
+                Anm_Union.SetTrigger("Gaman_State_Changed");
+                gaman_state = 1;
+            }
+        }
+        else
+        {
+            if (gaman_state != 0)
+            {
+                Anm_Union.SetInteger("Gaman_State", 0);
+                Anm_Union.SetTrigger("Gaman_State_Changed");
+                gaman_state = 0;
+            }
+        }
+
+        // フレーバー出現
+        TimetoSpawnFlavor -= Time.deltaTime;
+        if (TimetoSpawnFlavor < 0)
+        {
+            SpawnFlavor();
+            TimetoSpawnFlavor = 300.0f + 180 * Random.value;    // フレーバー出現時間（5m - 8m）
+        }
+#endif
+
+        UpdateDebugText();
+    }
+
+    void UpdateInit()
+    {
+        dbg(0, 2, "■Union");
+
+        // アプデ毎に1回読まないと大変なことになる
+        if (DTimeChecker == null) DTimeChecker = new();
+        dTime = DTimeChecker.GetDeltaTime();
+        dbg(0, 4, "dTime = " + dTime.ToString("F4"));
+        dbg(0, 5, "IngameTime = " + DTimeChecker.IngameTime.ToString("F4"));
+        dbg(0, 6, "LastIngameTime = " + DTimeChecker.LastIngameTime.ToString("F4"));
+
+        // トレース用in-gameタイム
+        if (ModeTrace)
+        {
+            dTime = 0;
+            dbg(0, 3, "トレースモード！");
+        }
+        else
+        {
+            dbg(0, 3, "通常通りに時間が流れています……");
+            //dTime = Time.deltaTime;    
+        }
+        // カクツキが発生した場合にブレークポイントを設定する
+        if (dTime > 1.0f / 15)
+        {
+            dTime = 1.0f / 15;
+            // 15fps以上で極端な数字は丸める
+        }
+
+        IngameTime += dTime;
+        frameTime += 1.0f / 60;
+        //dTime = 1.0f / 60;
+    }
+
+    void UpdateProductInfo()
+    {
+        // 生産物情報表示
+        int[] pi = tu.ProductItems;
+        ProdText.text = "\n\n\n" + "== Product Informations ==" + "\n" +
+            "Product = " + tu.mt.Product.ToString("F0") + "\n" +
+            "ProductHeart = " + tu.ProductHeart.ToString("F4") + "\n" +
+            "Syrup : " +
+                pi[1].ToString("D4") + " " + pi[2].ToString("D4") + " " + pi[3].ToString("D4") + " " + pi[4].ToString("D4") + " " + pi[5].ToString("D4") + " " +
+                pi[6].ToString("D4") + " " + pi[7].ToString("D4") + " " + pi[8].ToString("D4") + " " + pi[9].ToString("D4") + "\n" +
+                " Whip : " +
+                pi[11].ToString("D4") + " " + pi[12].ToString("D4") + " " + pi[13].ToString("D4") + " " + pi[14].ToString("D4") + " " + pi[15].ToString("D4") + " " +
+                pi[16].ToString("D4") + " " + pi[17].ToString("D4") + " " + pi[18].ToString("D4") + " " + pi[19].ToString("D4") + "\n" +
+                " Moti : " +
+                pi[21].ToString("D4") + " " + pi[22].ToString("D4") + " " + pi[23].ToString("D4") + " " + pi[24].ToString("D4") + " " + pi[25].ToString("D4") + " " +
+                pi[26].ToString("D4") + " " + pi[27].ToString("D4") + " " + pi[28].ToString("D4") + " " + pi[29].ToString("D4") + "\n" +
+                " ElmK : " +
+                pi[31].ToString("D4") + " " + pi[32].ToString("D4") + " " + pi[33].ToString("D4") + " " + pi[34].ToString("D4") + " " + pi[35].ToString("D4") + " " +
+                pi[36].ToString("D4") + " " + pi[37].ToString("D4") + " " + pi[38].ToString("D4") + " " + pi[39].ToString("D4") + "\n" +
+                "flIncProd = " + tu.mt.dbgflIncProd.ToString("F2") + "\n" +
+                "flLimProd = " + tu.mt.dbgflLimProd.ToString("F2") + "\n" +
+                "";
+
+#if Disabled_in_b59
+        // 表示時間を過ぎた生産物を消去（仮）
+        for (int i = tu.ProductFlavors.Count - 1; i >= 0; i--)
+        {
+            if (tu.ProductFlavors[i].GetComponent<Product>().TimesLeft < 0)
+            {
+                if (tu.ProductFlavors[i].GetComponent<Product>().Type == "Moti") mt.Produced -= 10.0f;
+                if (tu.ProductFlavors[i].GetComponent<Product>().Type == "Whip") mt.Produced -= 1.0f;
+                if (tu.ProductFlavors[i].GetComponent<Product>().Type == "Syrup") mt.Produced -= 0.1f;
+
+                tu.mt.Producing--;
+                tu.ProductFlavor_Num--;
+
+                Destroy(tu.ProductFlavors[i]);
+                tu.ProductFlavors.Remove(tu.ProductFlavors[i]);
+            }
+        }
+
+        // 生産ポップ処理
+        // 表示時間を過ぎたポップを消去
+        for (int i = 0; i < tu.ProdPops.Count; i++)
+        {
+            if (tu.ProdPops[i].GetComponent<ProdPop>().times < 0)
+            {
+                Destroy(tu.ProdPops[i]);
+                tu.ProdPops.Remove(tu.ProdPops[i]);
+            }
+        }
+#endif
+    }
+
+#if Disabled_in_b59
+    void UpdateProdAmount()
+    {
+        ProdAmountText.text = Mixture.Product.ToString("F2");            // 切り捨て（暫定）
+
+        //double val_a = Mixture.dProduct
+
+        // 赤から白に
+        float r = 1.0f;
+        float g = 1.0f - (float)EasyMath.PowCurve(
+            Mixture.dProduct, 10.0f, Mixture.Gaman
+            );
+        float b = 1.0f - (float)EasyMath.PowCurve(
+            Mixture.dProduct, 10.0f, Mixture.Gaman
+            );
+
+        ProdAmountText.color = new Color(r, g, b);
+        ProdAmountTextLabel.color = new Color(r, g, b);
+
+        /*{
+            //double TamekomiRatio = Tamekomi / Tamekomi_Limit;                // ためこみ率
+            //double InspRatio = Insp / Gaman_Limit;                // ためこみ率
+            double InspRatio = 0;                // ためこみ率
+
+            // 茶色から白に
+            float r = 0.5f + (float)EasyMath.PowCurve(
+                InspRatio, 1.0f, 0.5
+                );
+            float g = 0.3f + (float)EasyMath.PowCurve(
+                InspRatio, 1.0f, 0.7
+                );
+            float b = 0f + (float)EasyMath.PowCurve(
+                InspRatio, 1.0f, 1
+                );
+
+            Insp1Pop.GetComponent<SpriteRenderer>().color = new Color(r, g, b);
+            Insp1Pop.GetComponent<SpriteRenderer>().sortingOrder = o_popinsp1;
+        }*/
+    }
+#endif
+    void UpdateMood()
+    {
+        dbg(0, 20, "■ムード");
+
+        uuuDateTime = DateTime.Now;
+        DateTime udt = uuuDateTime;
+
+        int hr = udt.Hour;
+        int mn = udt.Minute;
+        int sc = udt.Second;
+        int ms = udt.Millisecond;
+
+        String TestTimeStr = "";
+        if (false)
+        {
+            TestTime += dTime * 5000.0f;
+            int TT = (int)TestTime;
+            TT %= 86400;
+            ms = 0;
+
+            hr = TT / 3600;
+            mn = (TT % 3600) / 60;
+            sc = (TT % 60);
+            TestTimeStr = "(TestTime - " + TT.ToString("D") + ")";
+
+            // hr = 14;     // 昼
+            // hr = 2;      // 夜
+        }
+
+        int hr2;
+        int mn2;
+        int sc2;
+        int ms2;
+
+        // 14時がムード最小値（14を差し引く）
+        // 分と秒はそのまま加算
+        if (hr >= 14)
+        {
+            dbg(0, 21, "昼間の14時以降");
+            hr2 = hr - 14;
+            mn2 = mn;
+            sc2 = sc;
+            ms2 = ms;
+        }
+        // 2時がムード最大値
+        // 分と秒は差し引く（2を差し引いて12から引く）
+        else if (hr >= 2)
+        {
+            dbg(0, 21, "真夜中2時以降");
+            if (hr >= 8) dbg(0, 21, "昼の14時前");
+            hr2 = 12 - (hr - 2);
+            mn2 = -mn;
+            sc2 = -sc;
+            ms2 = -ms;
+        }
+        // 2時前は10から足す
+        // 分と秒はそのまま加算
+        else
+        {
+            dbg(0, 21, "日付変わって2時前");
+            hr2 = 10 + hr;
+            mn2 = mn;
+            sc2 = sc;
+            ms2 = ms;
+        }
+
+        dbg(0, 22,
+            "現在時刻 - " + hr.ToString("D2") + " : " + mn.ToString("D2") + " : " + sc.ToString("D2") + " : " + ms.ToString("D3")
+             + TestTimeStr
+            );
+
+        dbg(0, 23,
+            "hr2 : " + hr2.ToString("D1") + ", mn2 : " + mn2.ToString("D1") + ", sc2 : " + sc2.ToString("D1") + ", ms2 : " + ms2.ToString("D1")
+            );
+
+        int moodtime = sc2 + mn2 * 60 + hr2 * 3600;
+        dbg(0, 24, "moodtime : " + moodtime.ToString("D1"));
+
+        Mood = ((float)moodtime / 43200f);
+        dbg(0, 25, "ムード : " + Mood.ToString("F4"));
+
+        // ムードが高いと背景が黒くなる
+        float r = OrgMoodColor.r * (1 - Mood);
+        float g = OrgMoodColor.g * (1 - Mood);
+        float b = OrgMoodColor.b * (1 - Mood);
+        float a = OrgMoodColor.a;
+
+        Camera.backgroundColor = new Color(r, g, b, a);
+    }
+
+#if Disabled_in_b59
+    IEnumerator AutoMix() // オートミクスチャ用コルーチン
+    {
+        while (true)
+        {
+            if (automix == 1)
+            {
+                if (irk == 0)
+                {
+                    automix_time = manual_automix_time;
+                }
+                else
+                {
+                    automix_time = irk_automix_time;
+                }
+                if (mix_state == 0)
+                {
+                    Anm_Union.ResetTrigger("Insp_return");
+                    Anm_Union.ResetTrigger("Insp_idle");
+                    Anm_Union.SetTrigger("Inspiration");
+                    mt.ui.UI_ResetTrigger("Insp_idle");
+                    mt.ui.UI_SetTrigger("Inspiration");
+
+                    if (mix_state == 0)
+                    {
+                        //GetComponents<AudioSource>()[0].Play();
+                        int r = Random.Range(1, 5);
+                        if (r == 1) Sound03_a1.Play();
+                        if (r == 2) Sound03_a2.Play();
+                        if (r == 3) Sound03_a3.Play();
+                        if (r == 4) Sound03_a4.Play();
+
+                        // r = Random.Range(1, 4);
+                        //if (r == 1) Sound01.Play();
+                        //if (r == 2) Sound01_a.Play();
+                        //if (r == 3) Sound01_b.Play();
+                        mix_state = 1;
+                        Mixture.DoMix();
+                        ms_LastInsp = IngameTime;
+                        //float ms_LastFrameTime = frameTime;
+                        yield return new WaitForSeconds(automix_time * 0.5f);
+                        // 差し込み0.5秒
+                        // トレース用処理
+                        while (IngameTime - ms_LastInsp < automix_time * 0.5f)
+                        {
+                            yield return new WaitForSeconds(0.01f);
+                        }
+                    }
+                    //Anm_Union.SetIntege
+                }
+                else
+                {
+                    Anm_Union.ResetTrigger("Inspiration");
+                    Anm_Union.SetTrigger("Insp_return");
+                    if (mix_state == 1)
+                    {
+                        //AudioSource[] audios = GetComponents<AudioSource>();
+                        int r = Random.Range(1, 4);
+                        if (r == 1) Sound02.Play();
+                        if (r == 2) Sound02_a.Play();
+                        if (r == 3) Sound02_b.Play();
+                        mix_state = 0;
+                        Mixture.DoMix();
+                        ms_LastInsp = IngameTime;
+                        //float ms_LastFrameTime = IngameTime;
+                        yield return new WaitForSeconds(automix_time * 0.2f);
+                        // 抜き0.2秒
+                        // トレース用処理
+                        while (IngameTime - ms_LastInsp < automix_time * 0.2f)
+                        {
+                            yield return new WaitForSeconds(0.01f);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Anm_Union.SetTrigger("Insp_return");
+                yield return new WaitForSeconds(0.01f);
+                Anm_Union.SetTrigger("Insp_idle");
+                mt.ui.UI_SetTrigger("Insp_idle");
+            }
+        }
+    }
+#endif
+
+    void OnMixPressed()
+    {
+
+    }
+    void OnMixReleased()
+    {
+
+    }
+
+    FileStream SetFileStream(int nData, String str)
+    {
+        FileStream fs;
+        String path = "UUUState" + nData.ToString("F0") + ".uuu";
+
+        FileIOString = "ファイル読み込みエラー！\n";
+        if (str == "w")
+        {
+            return File.Open(path, FileMode.OpenOrCreate);
+        }
+
+        return File.Open(path, FileMode.Open);
+    }
+
+    // ■ステートデータへのアクセス
+    // 読み込みと書き込みに両方対応しているので
+    // ここを書き換えるだけでセーブデータの形式を変更できる
+    public void AccessStateData(int nData, String rw)
+    {
+        FileStream fs;
+        fs = SetFileStream(nData, rw);
+
+        string strVer = UUUFileBuildVersion.str;
+
+        AccessVersion(fs, ref strVer, rw);
+        // バージョン情報の読み込み／書き込み
+
+        if (strVer == "UUUnionb52")
+        {
+            AccessIDDouble(fs, "Insp", ref tu.mt.Insp, rw);
+            AccessIDDouble(fs, "InspMinus", ref tu.mt.InspMinus, rw);
+            AccessIDDouble(fs, "Insp2", ref tu.mt.Insp2, rw);
+            AccessIDDouble(fs, "Insp3", ref tu.mt.Insp3, rw);
+            AccessIDDouble(fs, "Mix", ref tu.mt.Mix, rw);
+            AccessIDDouble(fs, "dMix", ref tu.mt.dMix, rw);
+            AccessIDDouble(fs, "Irk", ref tu.mt.Irk, rw);
+            AccessIDDouble(fs, "Prod", ref tu.mt.Product, rw);
+            AccessIDDouble(fs, "dProd", ref tu.mt.dProduct, rw);
+            AccessIDDouble(fs, "Sukkiri", ref tu.mt.Sukkiri, rw);
+            AccessIDDouble(fs, "dSukkiri", ref tu.mt.dSukkiri, rw);
+            AccessIDDouble(fs, "Tamaran_Insp", ref tu.mt.Tamaran_Insp, rw);
+            AccessIDDouble(fs, "Tamaran_A", ref tu.mt.Tamaran_A, rw);
+            AccessIDDouble(fs, "MaxKomiage", ref tu.mt.MaxKomiage, rw);
+            AccessIDDouble(fs, "MaxKomiageRate", ref tu.mt.MaxKomiageRate, rw);
+            AccessIDDouble(fs, "Komiage", ref tu.mt.Komiage, rw);
+            AccessIDDouble(fs, "Haki", ref tu.mt.Haki, rw);
+            AccessIDDouble(fs, "Haki_Rate", ref tu.mt.Haki_Rate, rw);
+            AccessIDDouble(fs, "Haki_Komi", ref tu.mt.Haki_Komi, rw);
+        }
+
+        fs.Close();
+    }
+
+    void AccessVersion(FileStream fs, ref String verID, String rw)
+    {
+        // Version表記はファイルの一番最初に
+        // ID + ビルドバージョンの組み合わせで記述する
+        // （例 : "IWannaUnionWithFilexxxxUUUnionb52"）
+        //
+        // これは今後の全バージョンで共通にすることで
+        // 以降のファイル形式の変更で多少の互換性を持たせる予定
+
+        if (rw == "w")
+        {
+            WriteString(fs, UUUFileBuildVersion.id);
+            WriteDouble(fs, UUUFileBuildVersion.str.Length);
+            // double型で文字長を書き込む
+            WriteString(fs, UUUFileBuildVersion.str);
+        }
+        if (rw == "r")
+        {
+            if (ReadString(fs, UUUFileBuildVersion.id.Length) == UUUFileBuildVersion.id)
+            {
+                int length = (int)ReadDouble(fs);
+                // double型で読み込んだ文字長をint型に変換する
+                verID = ReadString(fs, length);
+            }
+        }
+    }
+
+    // 参照を使ってdを書き込むか、dに読み込む
+    void AccessIDDouble(FileStream fs, String strID, ref double d, String rw)
+    {
+        if (rw == "w")
+        {
+            WriteIDDouble(fs, strID, d);
+        }
+        if (rw == "r")
+        {
+            d = ReadIDDouble(fs, strID);
+        }
+        //Mixture.FileIOString = "AccessIDDoubleは処理されてます！\n";
+    }
+
+    /*void WriteStateData(int nData)
+    {
+        FileStream fs;
+        fs = SetFileStream(nData, "w");
+
+        WriteIDDouble(fs, "Insp", Mixture.Insp);
+        WriteIDDouble(fs, "Insp2", Mixture.Insp2);
+        WriteIDDouble(fs, "Insp3", Mixture.Insp3);
+        WriteIDDouble(fs, "Gaman", Mixture.Gaman);
+        WriteIDDouble(fs, "Prod", Mixture.Product);
+
+        fs.Close();
+    }*/
+
+    void WriteIDDouble(FileStream fs, String strID, double d)
+    {
+        try
+        {
+            WriteID(fs, "Insp");
+            WriteDouble(fs, d);
+            FileIOString = "ファイル書き込みは上手く行ってます！\n";
+        }
+        catch (UUUFileIOException e)
+        {
+            FileIOString = "例外発生！ : " + e.str;
+        }
+    }
+
+    /*void ReadStateData(int nData)
+    {
+        FileStream fs;
+        fs = SetFileStream(nData, "r");
+
+        Mixture.Insp = ReadIDDouble(fs, "Insp");
+
+        fs.Close();
+    }*/
+    double ReadIDDouble(FileStream fs, String strID)
+    {
+        if (ReadID(fs, "Insp"))
+        {
+            double d = ReadDouble(fs);
+            FileIOString = "ファイル読み込みは上手く行ってます！\n";
+            return d;
+        }
+        return 0;
+    }
+
+    public void Komiage_Start(bool b)
+    {
+        if (b)
+        {
+            BGMKomiage.loop = true;
+            BGMKomiage.Play();
+        }
+        else
+        {
+            BGMKomiage.Stop();
+        }
+    }
+
+    public void Funbari_Start(bool b)
+    {
+        if (b)
+        {
+            BGMFunbari.loop = true;
+            BGMKomiage.Stop();
+            BGMFunbari.Play();
+        }
+        else
+        {
+            BGMFunbari.Stop();
+        }
+    }
+
+#if Disabled_in_b59
+    public void Result(int score)
+    {
+        funbari_state = 0;
+        ScoreText.text = score.ToString("F0");
+        SEScore.Play();
+        if (score >= 50)
+        {
+            SEManzoku.Play();
+        }
+        else if (score >= 10)
+        {
+            SEGakkari.Play();
+        }
+    }
+#endif
+
+    /*
+    public void SetWarn(int i)
+    {
+        int _i = TamaranTextAnim.GetInteger("Warn_Level");
+        TamaranTextAnim.SetInteger("Warn_Level", i);
+        TamaranTextAnimBody.SetInteger("Warn_Level", i);
+        TamaranTextAnimSmall.SetInteger("Warn_Level", i);
+        TamaranTextAnimPer.SetInteger("Warn_Level", i);
+        if (i != _i) {
+            UI_SetTrigger("Warn_Changed");
+        }
+    }
+
+    public void UI_SetTrigger(string name)
+    {
+        TamaranTextAnim.SetTrigger(name);
+        TamaranTextAnimBody.SetTrigger(name);
+        TamaranTextAnimSmall.SetTrigger(name);
+        TamaranTextAnimPer.SetTrigger(name);
+    }
+
+    public void UI_ResetTrigger(string name)
+    {
+        TamaranTextAnim.ResetTrigger(name);
+        TamaranTextAnimBody.ResetTrigger(name);
+        TamaranTextAnimSmall.ResetTrigger(name);
+        TamaranTextAnimPer.ResetTrigger(name);
+    }
+    */
+
+    public void SetMixVolume(float f)
+    {
+        Sound01.volume = DefVolume_Sound01 * f;
+        Sound01_a.volume = DefVolume_Sound01_a * f;
+        Sound01_b.volume = DefVolume_Sound01_b * f;
+        Sound02.volume = DefVolume_Sound02 * f;
+        Sound02_a.volume = DefVolume_Sound02_a * f;
+        Sound02_b.volume = DefVolume_Sound02_b * f;
+
+        Sound03_a1.volume = DefVolume_Sound03 * f;
+        Sound03_a2.volume = DefVolume_Sound03 * f;
+        Sound03_a3.volume = DefVolume_Sound03 * f;
+        Sound03_a4.volume = DefVolume_Sound03 * f;
+    }
+
+#if Disabled_in_b59
+    public void SpawnFlavor()
+    {
+        /*
+        if (!Flavor)
+        {
+            FlavorSpawn.Play();
+            Flavor = Instantiate(FlavorDoorKeyhole, Flavor_Pos.transform.position, Quaternion.identity, this.transform);
+            Flavor.SetActive(false);
+
+            Flavor Flavor2;
+            Flavor2 = Flavor.GetComponentInChildren<Flavor>();
+            Flavor2.Union = this.TargetUnion;
+            Flavor.SetActive(true);
+        }
+        */
+    }
+#endif
+
+#if Disabled_in_b59
+
+    public void AutoMix_Start()
+    {
+        if (automix == 0)
+        {
+            automix = 1;
+            StartCoroutine(AutoMix());
+        }
+    }
+
+    public void AutoMix_Stop()
+    {
+        if (automix != 0)
+        {
+            automix = 0;
+            StopCoroutine(AutoMix());
+        }
+    }
+#endif
+
+#if Disabled_in_b59
+    public void SetIrk(int n)
+    {
+        irk = n;
+        // 色気づいてしまった場合
+        if (irk != 0)
+        {
+            if (manual_automix == 0)
+            {
+                AutoMix_Start();
+            }
+        }
+        // 色気づいていたけど、気が済んだ場合
+        else
+        {
+            if (manual_automix == 0)
+            {
+                AutoMix_Stop();
+            }
+        }
+    }
+#endif
+
+    // デバッグ中にデバッグテキストが消滅するのでチェック
+    public void CheckDebugArray()
+    {
+        if (DTArray == null)
+        {
+            DTArray = new string[100, 100];
+        }
+    }
+
+    public void UpdateDebugText()
+    {
+        double flavor0 = 0;
+
+        /*
+        if (Fl.Count() != 0)
+        {
+            flavor0 = mt.Fl(0).value;
+        }*/
+
+        int page = 0;
+        int i = 0;
+        StringBuilder sb = new StringBuilder("\n\n\n\n== Debug Informations " + "(" + (DTPage + 1).ToString("D0") + "/" + "100" + ")" + " ==" + "\n");
+
+        foreach (string str in DTArray)
+        {
+            if (page == DTPage)
+            {
+                sb.Append("[" + i.ToString("D2") + "]");
+                sb.Append(str);
+                sb.Append("\n");
+            }
+            i++;
+            if (i >= 100)
+            {
+                i = 0;
+                page++;
+            }
+        }
+        DebugText2.text = sb.ToString();
+    }
+    public void dbg(int page, int i, string str)
+    {
+        DTArray[page, i] = str;
+    }
+}
