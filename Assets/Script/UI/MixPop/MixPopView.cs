@@ -78,4 +78,9 @@ public sealed class MixPopView : MonoBehaviour
     {
         maxAreaScale = Mathf.Max(1.0f, value);
     }
+
+    public float GetMaxAreaScale()
+    {
+        return maxAreaScale;
+    }
 }

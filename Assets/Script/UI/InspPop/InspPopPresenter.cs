@@ -57,8 +57,9 @@ public sealed class InspPopPresenter : MonoBehaviour
             var pixelsPerHalf = mixInput.DragPixelsPerHalfRadius > 0f
                 ? mixInput.DragPixelsPerHalfRadius
                 : dragPixelsPerHalfRadius;
+            var areaScale = mixView != null ? mixView.GetMaxAreaScale() : maxAreaScale;
             _mixPopCore.DragPixelsPerHalfRadius = pixelsPerHalf;
-            _mixPopCore.MaxAreaScale = maxAreaScale;
+            _mixPopCore.MaxAreaScale = areaScale;
             var pumpAdded = _mixPopCore.Tick(mixInput.GetDeltaY(), mixInput.IsPumping, mixPerClick, dt);
             if (pumpAdded > 0.0)
             {
@@ -68,7 +69,6 @@ public sealed class InspPopPresenter : MonoBehaviour
 
             if (mixView != null)
             {
-                mixView.SetMaxAreaScale(maxAreaScale);
                 mixView.ApplyMix(_mixPopCore.Charge, _mixPopCore.PumpLevel, mixPerClick);
             }
         }
