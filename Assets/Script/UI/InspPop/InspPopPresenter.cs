@@ -13,6 +13,7 @@ public sealed class InspPopPresenter : MonoBehaviour
 
     [Header("Tuning")]
     [SerializeField] private float mixPerClick = 0.01f; // 1回のポンプ強度（1% = 0.01）。
+    [SerializeField] private float dragPixelsPerHalfRadius = 100f; // 100pxで半径が50%になる基準距離。
 
     private readonly InspCore _core = new InspCore();
     private readonly MixRateTracker _mixRateTracker = new MixRateTracker();
@@ -52,6 +53,10 @@ public sealed class InspPopPresenter : MonoBehaviour
         // ミックスポップのポンプ入力。
         if (mixInput != null)
         {
+            var pixelsPerHalf = mixInput.DragPixelsPerHalfRadius > 0f
+                ? mixInput.DragPixelsPerHalfRadius
+                : dragPixelsPerHalfRadius;
+            _mixPopCore.DragPixelsPerHalfRadius = pixelsPerHalf;
             var pumpAdded = _mixPopCore.Tick(mixInput.DragPixels, mixInput.IsPumping, mixPerClick, dt);
             if (pumpAdded > 0.0)
             {
@@ -66,6 +71,7 @@ public sealed class InspPopPresenter : MonoBehaviour
         }
         else
         {
+            _mixPopCore.DragPixelsPerHalfRadius = dragPixelsPerHalfRadius;
             _mixPopCore.Tick(0.0, false, mixPerClick, dt);
         }
 
@@ -97,13 +103,21 @@ public sealed class InspPopPresenter : MonoBehaviour
     private void RegisterDebugValues(double mixAvgSpeed)
     {
         GameDebug.Set("Insp", $"{_core.Insp:F3}");
-        GameDebug.Set("Mix", $"{_core.Mix:F3}");
-        GameDebug.Set("MixAvg", $"{mixAvgSpeed:F4}");
+        GameDebug.Set("Mix", $"{_core.Mix:F6}");
+        GameDebug.Set("MixAvg", $"{mixAvgSpeed:F6}");
         GameDebug.Set("Limit", $"{_gamanCore.LimitSpeed:F4}");
         GameDebug.Set("GamanA", $"{_gamanCore.LoadRatioA:F3}");
         GameDebug.Set("Gaman", $"{_gamanCore.GamanValue:F3}");
-        GameDebug.Set("MixCharge", $"{_mixPopCore.Charge:F3}");
-        GameDebug.Set("MixPump", $"{_mixPopCore.PumpLevel:F3}");
+        GameDebug.Set("MixCharge", $"{_mixPopCore.Charge:F6}");
+        GameDebug.Set("MixPump", $"{_mixPopCore.PumpLevel:F6}");
+        GameDebug.Set("MixRadius", $"{_mixPopCore.DragScale:F6}");
+        if (mixInput != null)
+        {
+            GameDebug.Set("MixClickY", $"{mixInput.ClickY:F2}");
+            GameDebug.Set("MixAnchorY", $"{mixInput.AnchorY:F2}");
+            GameDebug.Set("MixCurrentY", $"{mixInput.CurrentY:F2}");
+            GameDebug.Set("MixDragPx", $"{mixInput.DragPixels:F6}");
+        }
     }
 
     private void OnRightClicked()
