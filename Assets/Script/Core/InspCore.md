@@ -8,9 +8,10 @@ Unityプロジェクトに Insp（メイン値） と Mix（燃料） を実装�
 InspPop（丸いUI）は最終的に重要UIだが、現時点では 膨らむ表示 だけ作る。
 
 # 用語
-Insp: ゲームのメイン値（蓄積される）
-Mix: Inspに変換される燃料
-InspPop: Inspを表示・操作する丸いUI
+- Insp: ゲームのメイン値（蓄積される）
+  - インスピレーション、インスピ
+- Mix: Inspに変換される燃料
+- InspPop: Inspを表示・操作する丸いUI
 
 ## ミックス速度
 MixRateTracker.csでミックス速度を算出します。
