@@ -66,13 +66,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets\Script\UI\GamanPop\GamanPopView.cs" />
+    <Compile Include="Assets\Script\UI\MixPop\MixPopInput.cs" />
     <Compile Include="Assets\Script\Core\GamanCore.cs" />
+    <Compile Include="Assets\Script\UI\MixPop\MixPopView.cs" />
     <Compile Include="Assets\Script\Core\EmaHalfLife.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopView.cs" />
     <Compile Include="Assets\Script\Core\Debug\GameDebugOverlay.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopPresenter.cs" />
     <Compile Include="Assets\Script\Core\MixRateTracker.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopInput.cs" />
+    <Compile Include="Assets\Script\Core\MixPopCore.cs" />
     <Compile Include="Assets\Script\Core\InspCore.cs" />
   </ItemGroup>
   <ItemGroup>

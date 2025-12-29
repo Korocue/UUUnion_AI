@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 // このファイルは MixPop のポンプ入力（右ボタン＋ドラッグ）を担当する。
 // 仕様: Assets/Script/Core/MixCore.md
@@ -25,7 +25,7 @@ public sealed class MixPopInput : MonoBehaviour
         if (IsPumping)
         {
             var currentY = Input.mousePosition.y;
-            DragPixels = Mathf.Max(0f, _startY - currentY);
+            DragPixels = Mathf.Max(0f, currentY - _startY);
         }
     }
 }

@@ -57,8 +57,9 @@ public sealed class MixPopCore
 
     private static double ComputeDragScale(double dragPixels)
     {
-        var shrink = (dragPixels / DragPixelsPerHalfRadius) * 0.5;
-        var scale = 1.0 - shrink;
+        var normalized = dragPixels / DragPixelsPerHalfRadius;
+        var scale = Math.Pow(0.5, normalized);
+
         if (scale < 0.0)
         {
             return 0.0;
