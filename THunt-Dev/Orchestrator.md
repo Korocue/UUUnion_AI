@@ -1,4 +1,4 @@
-THunt-Dev/Prchestrator.md
+THunt-Dev/Orchestrator.md
 
 # メインプロンプト
 このプロンプトはT-Huntフレームワークに準拠します。
@@ -26,6 +26,6 @@ _AGENTS.md の「コードレビューと信頼性」に従い
 (2重コメントに配慮しつつ、「日本語で」簡潔にお願いします)
 
 ## コーディング
-/Assets/Script/Main.md に従って
+Assets/Script/Main.md に従って
 ゲームのコーディングを行ってください。
 

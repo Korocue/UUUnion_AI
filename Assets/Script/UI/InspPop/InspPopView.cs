@@ -1,8 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// Visual update for InspPop (scale + color band).
-// Spec: Assets/Script/Core/InspCore.md
+// このファイルは InspPop の見た目（スケールと色帯）だけを更新する。
+// 仕様: Assets/Script/Core/InspCore.md
 public sealed class InspPopView : MonoBehaviour
 {
     [Header("Bindings")]
@@ -11,16 +11,16 @@ public sealed class InspPopView : MonoBehaviour
     [SerializeField] private Image inspImage;
 
     [Header("Tuning")]
-    [SerializeField] private float baseScale = 0.0f;    // Scale at Insp=0 (area-based).
-    [SerializeField] private float scalePerInsp = 0.5f; // sqrt(Insp) -> scale.
-    [SerializeField] private float inspPer100 = 1.0f;   // Insp value that represents 100%.
+    [SerializeField] private float baseScale = 0.0f;    // Insp=0 のときのスケール（面積ベース）。
+    [SerializeField] private float scalePerInsp = 0.5f; // sqrt(Insp) をスケールに変換する係数。
+    [SerializeField] private float inspPer100 = 1.0f;   // 100% を表す Insp 値。
 
     [Header("Gaman Overlay")]
-    [SerializeField] private float gamanPer100 = 1.0f;  // Gaman value that represents 100%.
-    [SerializeField] private float scalePerGaman = 0.5f;// sqrt(Gaman) -> scale.
+    [SerializeField] private float gamanPer100 = 1.0f;  // 100% を表す Gaman 値。
+    [SerializeField] private float scalePerGaman = 0.5f;// sqrt(Gaman) をスケールに変換する係数。
 
     [Header("Color Band")]
-    [SerializeField] private Color color0 = new Color(0f, 1f, 0f); // 0% (green)
+    [SerializeField] private Color color0 = new Color(0f, 1f, 0f); // 0%（緑）
     [SerializeField] private Color color50 = Color.white;          // 50%
     [SerializeField] private Color color100 = Color.yellow;        // 100%
     [SerializeField] private Color color200 = Color.red;           // 200%
@@ -28,7 +28,7 @@ public sealed class InspPopView : MonoBehaviour
 
     private void OnEnable()
     {
-        // Spec: initial localScale is 0 (no circle at start).
+        // 仕様: 初期 localScale は 0（円を表示しない）。
         if (inspPop != null)
         {
             inspPop.localScale = Vector3.zero;
@@ -37,7 +37,7 @@ public sealed class InspPopView : MonoBehaviour
         ApplyColor(0.0f);
     }
 
-    // Presenter passes Insp and Gaman values; this class only updates visuals.
+    // Presenter から Insp/Gaman 値を受け取り、見た目だけ更新する。
     public void ApplyInsp(double insp, double gamanValue)
     {
         if (inspPop == null)

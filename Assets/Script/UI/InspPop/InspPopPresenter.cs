@@ -1,20 +1,23 @@
 using UnityEngine;
 
-// Presenter for InspPop: owns core data and updates view each frame.
-// Spec: Assets/Script/Core/InspCore.md
+// このファイルは InspPop の Presenter としてコア状態を持ち、毎フレーム表示を更新する。
+// 仕様: Assets/Script/Core/InspCore.md
 public sealed class InspPopPresenter : MonoBehaviour
 {
     [Header("Bindings")]
     [SerializeField] private InspPopView view;
     [SerializeField] private GamanPopView gamanView;
     [SerializeField] private InspPopInput input;
+    [SerializeField] private MixPopView mixView;
+    [SerializeField] private MixPopInput mixInput;
 
     [Header("Tuning")]
-    [SerializeField] private float mixPerClick = 0.01f; // Mix per input (1% = 0.01).
+    [SerializeField] private float mixPerClick = 0.01f; // 1回のポンプ強度（1% = 0.01）。
 
     private readonly InspCore _core = new InspCore();
     private readonly MixRateTracker _mixRateTracker = new MixRateTracker();
     private readonly GamanCore _gamanCore = new GamanCore();
+    private readonly MixPopCore _mixPopCore = new MixPopCore();
 
     private float _logTimer;
     private double _movedSinceLastLog;
@@ -38,15 +41,35 @@ public sealed class InspPopPresenter : MonoBehaviour
 
     private void Update()
     {
-        // Fallback: detect right click when no input binding is set.
-        if (input == null && Input.GetMouseButtonDown(1))
+        // 入力未設定時のフォールバックとして右クリックを検知する。
+        if (input == null && mixInput == null && Input.GetMouseButtonDown(1))
         {
             OnRightClicked();
         }
 
         var dt = Time.deltaTime;
 
-        // Mix -> Insp conversion.
+        // ミックスポップのポンプ入力。
+        if (mixInput != null)
+        {
+            var pumpAdded = _mixPopCore.Tick(mixInput.DragPixels, mixInput.IsPumping, mixPerClick, dt);
+            if (pumpAdded > 0.0)
+            {
+                _core.AddMix(pumpAdded);
+                _mixAddedThisFrame += pumpAdded;
+            }
+
+            if (mixView != null)
+            {
+                mixView.ApplyMix(_mixPopCore.Charge, _mixPopCore.DragScale, mixPerClick);
+            }
+        }
+        else
+        {
+            _mixPopCore.Tick(0.0, false, mixPerClick, dt);
+        }
+
+        // Mix -> Insp 変換。
         var moved = _core.Tick(dt);
         _movedSinceLastLog += moved;
 
@@ -56,7 +79,7 @@ public sealed class InspPopPresenter : MonoBehaviour
         var mixAvgSpeed = _mixRateTracker.Tick(mixAdded, dt);
         _gamanCore.Tick(_core.Insp, mixAvgSpeed, mixPerClick, dt);
 
-        // View update.
+        // View を更新する。
         if (view != null)
         {
             view.ApplyInsp(_core.Insp, _gamanCore.GamanValue);
@@ -67,7 +90,7 @@ public sealed class InspPopPresenter : MonoBehaviour
             gamanView.ApplyGaman(_gamanCore.GamanValue);
         }
 
-        // Debug values (rendered by GameDebugOverlay).
+        // デバッグ値（GameDebugOverlay が描画）。
         RegisterDebugValues(mixAvgSpeed);
     }
 
@@ -79,11 +102,18 @@ public sealed class InspPopPresenter : MonoBehaviour
         GameDebug.Set("Limit", $"{_gamanCore.LimitSpeed:F4}");
         GameDebug.Set("GamanA", $"{_gamanCore.LoadRatioA:F3}");
         GameDebug.Set("Gaman", $"{_gamanCore.GamanValue:F3}");
+        GameDebug.Set("MixCharge", $"{_mixPopCore.Charge:F3}");
+        GameDebug.Set("MixPump", $"{_mixPopCore.PumpLevel:F3}");
     }
 
     private void OnRightClicked()
     {
-        // Mix increases on right click (spec: InspCore.md).
+        if (mixInput != null)
+        {
+            return;
+        }
+
+        // 右クリックで Mix が増える（仕様: InspCore.md）。
         _core.AddMix(mixPerClick);
         _mixAddedThisFrame += mixPerClick;
     }

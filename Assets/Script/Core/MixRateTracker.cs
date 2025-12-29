@@ -1,5 +1,5 @@
-// Mix average speed tracker (half-life EMA).
-// Spec: Assets/Script/Core/InspCore.md
+// Mix の平均速度を追跡する（half-life EMA）。
+// 仕様: Assets/Script/Core/InspCore.md
 public sealed class MixRateTracker
 {
     private const double DefaultHalfLifeSeconds = 1.0;
@@ -13,7 +13,7 @@ public sealed class MixRateTracker
 
     public double MixAvgSpeed => _ema.Value;
 
-    // mixAdded: delta Mix within this frame, dt: seconds.
+    // mixAdded: このフレームで増えた Mix、dt: 秒。
     public double Tick(double mixAdded, double dt)
     {
         if (dt <= 0.0)
@@ -22,7 +22,7 @@ public sealed class MixRateTracker
         }
 
         var safeMixAdded = mixAdded > 0.0 ? mixAdded : 0.0;
-        // Half of the real mix rate is used as EMA input (spec update).
+        // 実際のミックス速度の半分を EMA 入力として使う（仕様更新）。
         var inputRate = (safeMixAdded / dt) * 0.5;
         return _ema.Step(inputRate, dt);
     }
