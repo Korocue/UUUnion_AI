@@ -1,8 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-// Visual update for GamanPop (area + color).
-// Spec: Assets/Script/Core/GamanCore.md
+// このファイルは GamanPop の見た目（面積と色）だけを更新する。
+// 仕様: Assets/Script/Core/GamanCore.md
 public sealed class GamanPopView : MonoBehaviour
 {
     [Header("Bindings")]
@@ -11,17 +11,17 @@ public sealed class GamanPopView : MonoBehaviour
     [SerializeField] private Image gamanImage;
 
     [Header("Tuning")]
-    [SerializeField] private float baseScale = 0.0f;     // Scale at Gaman=0 (area-based).
-    [SerializeField] private float scalePerGaman = 0.5f; // sqrt(Gaman) -> scale.
-    [SerializeField] private float gamanPer100 = 1.0f;   // Gaman value that represents 100%.
+    [SerializeField] private float baseScale = 0.0f;     // Gaman=0 のときのスケール（面積ベース）。
+    [SerializeField] private float scalePerGaman = 0.5f; // sqrt(Gaman) をスケールに変換する係数。
+    [SerializeField] private float gamanPer100 = 1.0f;   // 100% を表す Gaman 値。
 
     [Header("Color Band")]
-    [SerializeField] private Color color0 = new Color(0.5f, 0.5f, 0.5f);     // 0% gray (128)
-    [SerializeField] private Color color50 = new Color(0.25f, 0.25f, 0.25f); // 50% dark gray (64)
-    [SerializeField] private Color color80 = Color.black;                   // 80% black
-    [SerializeField] private Color color90 = new Color(0f, 0.25f, 0.25f);    // 90% navy-ish (0,64,64)
-    [SerializeField] private Color color100 = Color.red;                    // 100% red
-    [SerializeField] private Color color200 = Color.white;                  // 200% white
+    [SerializeField] private Color color0 = new Color(0.5f, 0.5f, 0.5f);     // 0%のグレー（128）
+    [SerializeField] private Color color50 = new Color(0.25f, 0.25f, 0.25f); // 50%のダークグレー（64）
+    [SerializeField] private Color color80 = Color.black;                   // 80%の黒
+    [SerializeField] private Color color90 = new Color(0f, 0.25f, 0.25f);    // 90%のネイビー寄り（0,64,64）
+    [SerializeField] private Color color100 = Color.red;                    // 100%の赤
+    [SerializeField] private Color color200 = Color.white;                  // 200%の白
 
     private void OnEnable()
     {
@@ -33,7 +33,7 @@ public sealed class GamanPopView : MonoBehaviour
         ApplyColor(0.0f);
     }
 
-    // Presenter passes Gaman value; this class only updates visuals.
+    // Presenter から Gaman 値を受け取り、見た目だけ更新する。
     public void ApplyGaman(double gamanValue)
     {
         if (gamanPop == null)

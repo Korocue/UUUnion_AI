@@ -2,7 +2,7 @@
 
 # インスピレーションの設定
 Assets\Script\Old\Uni_Mxt_Old.cs.disabledを参考に
-右クリックで1%mixを増加させるプログラムを作ってください。
+インスピレーションをコーディングしてください。
 
 ## 目的
 Unityプロジェクトに Insp（メイン値） と Mix（燃料） を実装する。
@@ -12,10 +12,11 @@ Unityプロジェクトに Insp（メイン値） と Mix（燃料） を実装�
 /Assets/Script/UI/InspPop/InspPop.mdに従い
 ミクスチャの内部状態を表示します
 
-## 用語
-Insp: ゲームのメイン値（蓄積される）
-Mix: Inspに変換される燃料
-InspPop: Inspを表示・操作する丸いUI
+# 用語
+- Insp: ゲームのメイン値（蓄積される）
+  - インスピレーション、インスピ
+- Mix: Inspに変換される燃料
+- InspPop: Inspを表示・操作する丸いUI
 
 ## ミックス速度
 MixRateTracker.csでミックス速度を算出します。
@@ -58,7 +59,6 @@ InspCore を保持して Tick(Time.deltaTime) を呼ぶ
 Presenterから渡された値で見た目更新だけする
 
 ## 完成条件（Acceptance Criteria）
-再生中、右クリックでMixが増える（ログで確認可能）
 Mixは放置すると約0.2秒スケールで0に近づき、同量がInspに増える（ログで確認可能）
 Inspが増えると InspPop の丸が膨らむ（Transform.localScale）
 - localScaleの初期値は0
