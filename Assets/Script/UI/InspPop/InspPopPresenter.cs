@@ -58,6 +58,7 @@ public sealed class InspPopPresenter : MonoBehaviour
                 : dragPixelsPerHalfRadius;
             _mixPopCore.DragPixelsPerHalfRadius = pixelsPerHalf;
             var pumpAdded = _mixPopCore.Tick(mixInput.DragPixels, mixInput.IsPumping, mixPerClick, dt);
+            mixInput.SetPumpLevel((float)_mixPopCore.PumpLevel);
             if (pumpAdded > 0.0)
             {
                 _core.AddMix(pumpAdded);

@@ -15,6 +15,7 @@ public sealed class MixPopInput : MonoBehaviour
     private float _startY;
     private float _maxDownFromClick;
     private float _maxUpFromClick;
+    private float _pumpLevel;
 
     [SerializeField] private float anchorFollowRate = 0.5f; // 下方向の移動量に対する基準点の追従率。
     [SerializeField] private float dragPixelsPerHalfRadius = 100f; // 100pxで半径が50%になる基準距離。
@@ -49,7 +50,7 @@ public sealed class MixPopInput : MonoBehaviour
             }
 
             var upFromClick = currentY - _clickY;
-            if (upFromClick > _maxUpFromClick && IsShrinkOver90(upFromClick))
+            if (upFromClick > _maxUpFromClick && _pumpLevel >= 0.9f)
             {
                 _maxUpFromClick = upFromClick;
             }
@@ -64,16 +65,9 @@ public sealed class MixPopInput : MonoBehaviour
         }
     }
 
-    private bool IsShrinkOver90(float upFromClick)
+    // 上方向補正の判定は PumpLevel によって行う。
+    public void SetPumpLevel(float pumpLevel)
     {
-        if (upFromClick <= 0f)
-        {
-            return false;
-        }
-
-        var denom = Mathf.Max(0.0001f, dragPixelsPerHalfRadius);
-        var normalized = upFromClick / denom;
-        var scale = Mathf.Pow(0.5f, normalized);
-        return scale <= 0.1f;
+        _pumpLevel = Mathf.Clamp01(pumpLevel);
     }
 }
