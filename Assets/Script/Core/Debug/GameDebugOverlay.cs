@@ -36,6 +36,8 @@ public sealed class GameDebugOverlay : MonoBehaviour
     [SerializeField] private float width = 260f;
     [SerializeField] private float height = 180f;
 
+    private GUIStyle _labelStyle;
+
     private void Update()
     {
         if (Input.GetKeyDown(toggleKey))
@@ -51,14 +53,27 @@ public sealed class GameDebugOverlay : MonoBehaviour
             return;
         }
 
-        GUILayout.BeginArea(new Rect(x, y, width, height), GUI.skin.box);
-        GUILayout.Label("Debug");
+        if (_labelStyle == null)
+        {
+            _labelStyle = new GUIStyle(GUI.skin.label)
+            {
+                padding = new RectOffset(0, 0, 0, 0),
+                margin = new RectOffset(0, 0, 0, 0),
+                fontSize = 12,
+                fixedHeight = 14
+            };
+        }
+
+        var fullHeight = Mathf.Max(0f, Screen.height - y * 2f);
+        var areaHeight = Mathf.Max(height, fullHeight);
+        GUILayout.BeginArea(new Rect(x, y, width, areaHeight), GUI.skin.box);
+        GUILayout.Label("Debug", _labelStyle);
 
         foreach (var key in GameDebug.Keys)
         {
             if (GameDebug.TryGet(key, out var value))
             {
-                GUILayout.Label($"{key}: {value}");
+                GUILayout.Label($"{key}: {value}", _labelStyle);
             }
         }
 
