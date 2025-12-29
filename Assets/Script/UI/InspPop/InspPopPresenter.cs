@@ -14,6 +14,7 @@ public sealed class InspPopPresenter : MonoBehaviour
     [Header("Tuning")]
     [SerializeField] private float mixPerClick = 0.01f; // 1回のポンプ強度（1% = 0.01）。
     [SerializeField] private float dragPixelsPerHalfRadius = 100f; // 100pxで半径が50%になる基準距離。
+    [SerializeField] private float maxAreaScale = 1.5f; // 100%以上の面積上限。
 
     private readonly InspCore _core = new InspCore();
     private readonly MixRateTracker _mixRateTracker = new MixRateTracker();
@@ -57,8 +58,8 @@ public sealed class InspPopPresenter : MonoBehaviour
                 ? mixInput.DragPixelsPerHalfRadius
                 : dragPixelsPerHalfRadius;
             _mixPopCore.DragPixelsPerHalfRadius = pixelsPerHalf;
-            var pumpAdded = _mixPopCore.Tick(mixInput.DragPixels, mixInput.IsPumping, mixPerClick, dt);
-            mixInput.SetPumpLevel((float)_mixPopCore.PumpLevel);
+            _mixPopCore.MaxAreaScale = maxAreaScale;
+            var pumpAdded = _mixPopCore.Tick(mixInput.GetDeltaY(), mixInput.IsPumping, mixPerClick, dt);
             if (pumpAdded > 0.0)
             {
                 _core.AddMix(pumpAdded);
@@ -67,12 +68,14 @@ public sealed class InspPopPresenter : MonoBehaviour
 
             if (mixView != null)
             {
-                mixView.ApplyMix(_mixPopCore.Charge, _mixPopCore.DragScale, mixPerClick);
+                mixView.SetMaxAreaScale(maxAreaScale);
+                mixView.ApplyMix(_mixPopCore.Charge, _mixPopCore.PumpLevel, mixPerClick);
             }
         }
         else
         {
             _mixPopCore.DragPixelsPerHalfRadius = dragPixelsPerHalfRadius;
+            _mixPopCore.MaxAreaScale = maxAreaScale;
             _mixPopCore.Tick(0.0, false, mixPerClick, dt);
         }
 
@@ -115,9 +118,8 @@ public sealed class InspPopPresenter : MonoBehaviour
         if (mixInput != null)
         {
             GameDebug.Set("MixClickY", $"{mixInput.ClickY:F2}");
-            GameDebug.Set("MixAnchorY", $"{mixInput.AnchorY:F2}");
             GameDebug.Set("MixCurrentY", $"{mixInput.CurrentY:F2}");
-            GameDebug.Set("MixDragPx", $"{mixInput.DragPixels:F6}");
+            GameDebug.Set("MixDeltaY", $"{mixInput.DeltaY:F6}");
         }
     }
 
