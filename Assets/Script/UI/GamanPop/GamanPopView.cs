@@ -22,6 +22,7 @@ public sealed class GamanPopView : MonoBehaviour
     [SerializeField] private Color color90 = new Color(0f, 0.25f, 0.25f);    // 90%のネイビー寄り（0,64,64）
     [SerializeField] private Color color100 = Color.red;                    // 100%の赤
     [SerializeField] private Color color200 = Color.white;                  // 200%の白
+    [SerializeField] private Color color300 = new Color(1f, 0f, 1f);         // 300%のピンク（255,0,255）
 
     private void OnEnable()
     {
@@ -96,6 +97,12 @@ public sealed class GamanPopView : MonoBehaviour
             return Color.Lerp(color100, color200, t);
         }
 
-        return color200;
+        if (ratio100 <= 3.0f)
+        {
+            var t = ratio100 - 2.0f;
+            return Color.Lerp(color200, color300, t);
+        }
+
+        return color300;
     }
 }

@@ -49,4 +49,12 @@ public sealed class InspCore
 
         return moved;
     }
+
+    // バクハツ時に Insp を全量回収して0にする。
+    public double ConsumeInsp()
+    {
+        var amount = _insp;
+        _insp = 0.0;
+        return amount;
+    }
 }

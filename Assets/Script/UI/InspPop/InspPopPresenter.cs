@@ -24,6 +24,7 @@ public sealed class InspPopPresenter : MonoBehaviour
     private float _logTimer;
     private double _movedSinceLastLog;
     private double _mixAddedThisFrame;
+    private double _production;
 
     private void OnEnable()
     {
@@ -88,6 +89,10 @@ public sealed class InspPopPresenter : MonoBehaviour
 
         var mixAvgSpeed = _mixRateTracker.Tick(mixAdded, dt);
         _gamanCore.Tick(_core.Insp, mixAvgSpeed, mixPerClick, dt);
+        if (_gamanCore.GamanValue > 3.0)
+        {
+            _production += _core.ConsumeInsp();
+        }
 
         // View を更新する。
         if (view != null)
@@ -106,6 +111,7 @@ public sealed class InspPopPresenter : MonoBehaviour
 
     private void RegisterDebugValues(double mixAvgSpeed)
     {
+        GameDebug.Set("Product", $"{_production:F3}");
         GameDebug.Set("Insp", $"{_core.Insp:F3}");
         GameDebug.Set("Mix", $"{_core.Mix:F6}");
         GameDebug.Set("MixAvg", $"{mixAvgSpeed:F6}");

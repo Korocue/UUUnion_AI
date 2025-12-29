@@ -3,6 +3,9 @@ THunt-Dev/ChatRoom/Chat.md
 # Log-63.md
 - Branch: b64
 
+# M82
+feat : gaman / add bakuhatsu production conversion
+
 # M81
 feat : mixpop / add pump-driven mix pop core and UI
 
