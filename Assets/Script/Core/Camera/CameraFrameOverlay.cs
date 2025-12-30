@@ -11,14 +11,17 @@ public sealed class CameraFrameOverlay : MonoBehaviour
     [SerializeField] private float heightScale = 5f;   // height = OrthographicSize * heightScale
     [SerializeField] private float depthOffset = 1f;
     [SerializeField] private float lineWidth = 0.02f;
+    [SerializeField] private float lineInset = 0.02f;
 
     [Header("Colors")]
     [SerializeField] private Color fillColor = new Color(0.6f, 0.8f, 1f, 0.15f);
     [SerializeField] private Color lineColor = new Color(0.5f, 0.8f, 1f, 1f);
+    [SerializeField] private Color innerLineColor = Color.white;
 
     private Transform _root;
     private Transform _fill;
     private LineRenderer _line;
+    private LineRenderer _innerLine;
 
     private void OnEnable()
     {
@@ -28,16 +31,12 @@ public sealed class CameraFrameOverlay : MonoBehaviour
         }
 
         EnsureObjects();
+        UpdateFrame();
     }
 
     private void LateUpdate()
     {
-        if (targetCamera == null)
-        {
-            return;
-        }
-
-        UpdateFrame();
+        // 初期状態で固定する。
     }
 
     private void EnsureObjects()
@@ -79,6 +78,17 @@ public sealed class CameraFrameOverlay : MonoBehaviour
         _line.startColor = lineColor;
         _line.endColor = lineColor;
         _line.material = new Material(Shader.Find("Unlit/Color")) { color = lineColor };
+
+        var innerLineObject = new GameObject("FrameLineInner");
+        innerLineObject.transform.SetParent(_root, false);
+        _innerLine = innerLineObject.AddComponent<LineRenderer>();
+        _innerLine.positionCount = 5;
+        _innerLine.useWorldSpace = false;
+        _innerLine.startWidth = lineWidth;
+        _innerLine.endWidth = lineWidth;
+        _innerLine.startColor = innerLineColor;
+        _innerLine.endColor = innerLineColor;
+        _innerLine.material = new Material(Shader.Find("Unlit/Color")) { color = innerLineColor };
     }
 
     private void UpdateFrame()
@@ -87,7 +97,8 @@ public sealed class CameraFrameOverlay : MonoBehaviour
         var width = height * targetCamera.aspect;
         var z = targetCamera.nearClipPlane + depthOffset;
 
-        _root.localPosition = new Vector3(0f, 0f, z);
+        _root.position = targetCamera.transform.position + targetCamera.transform.forward * z;
+        _root.rotation = targetCamera.transform.rotation;
         _fill.localScale = new Vector3(width, height, 0.01f);
 
         var halfW = width * 0.5f;
@@ -97,5 +108,13 @@ public sealed class CameraFrameOverlay : MonoBehaviour
         _line.SetPosition(2, new Vector3(halfW, halfH, 0f));
         _line.SetPosition(3, new Vector3(-halfW, halfH, 0f));
         _line.SetPosition(4, new Vector3(-halfW, -halfH, 0f));
+
+        var insetW = Mathf.Max(0f, halfW - lineInset);
+        var insetH = Mathf.Max(0f, halfH - lineInset);
+        _innerLine.SetPosition(0, new Vector3(-insetW, -insetH, 0f));
+        _innerLine.SetPosition(1, new Vector3(insetW, -insetH, 0f));
+        _innerLine.SetPosition(2, new Vector3(insetW, insetH, 0f));
+        _innerLine.SetPosition(3, new Vector3(-insetW, insetH, 0f));
+        _innerLine.SetPosition(4, new Vector3(-insetW, -insetH, 0f));
     }
 }
