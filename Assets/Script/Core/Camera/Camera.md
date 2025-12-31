@@ -13,15 +13,22 @@
 # デフォルトの画面を四角形で表示
 デフォルト表示エリアを背景に四角形で表示
 画面上にCubeとLineを駆使して
-薄い青の枠線、白い線付きの長方形をワールド上に配置する
-- 高さ OrthographicSize * 5
+任意の色の塗りつぶし、白い枠線付きの長方形をワールド上に配置する
+- 高さ OrthographicSize(5) * 2
 - 幅 height * アスペクト比
 - これらは初期状態で固定した状態で動かさない
   - パンによる追従などもせず、完全に固定してください
 - これはカメラのフレームではなく
 - ユーザーがこの四角形に合わせることによって
-  - カメラの初期配置が再現できるようになるための目印 
+  - カメラの初期配置が再現できるようになるための目印
 
-
+# 半透明処理について
+以下は半透明表示を行うためのマテリアル設定条件とする
+- Shader = Universal Render Pipeline/Unlit を使用
+- Surface Type = Transparent
+- Blending = Alpha
+- ZWrite = Off
+- Base Color (RGBA) の A を 0.1 に設定
+- RenderQueue = Transparent (3000)
 
 

@@ -3,6 +3,15 @@ THunt-Dev/ChatRoom/Chat.md
 # Log-83.md
 - Branch: b65
 
+# CC87
+feat : camera / roll on R/F and fix CameraDefaultArea overlay
+
+# CC86
+半透明が適用出来ました。
+
+こちらで仕様書に可能な限り追記したいので
+半透明を実現するための処理を簡潔に提示してください
+
 # CC85
 画面が回転するだけで移動できません。
 画面がズームイン / アウト出来ません。
