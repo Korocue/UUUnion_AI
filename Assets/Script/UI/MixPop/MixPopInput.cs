@@ -21,6 +21,7 @@ public sealed class MixPopInput : MonoBehaviour
         if (Input.GetMouseButtonDown(1))
         {
             IsPumping = true;
+            SetCursorLock(true);
             _clickY = Input.mousePosition.y;
             _lastY = _clickY;
             ClickY = _clickY;
@@ -31,6 +32,7 @@ public sealed class MixPopInput : MonoBehaviour
         else if (Input.GetMouseButtonUp(1))
         {
             IsPumping = false;
+            SetCursorLock(false);
             DragPixels = 0f;
             DeltaY = 0f;
         }
@@ -46,4 +48,19 @@ public sealed class MixPopInput : MonoBehaviour
 
     // DeltaY を取得する（上方向は正、下方向は負）。
     public float GetDeltaY() => DeltaY;
+
+    private void OnDisable()
+    {
+        if (IsPumping)
+        {
+            IsPumping = false;
+            SetCursorLock(false);
+        }
+    }
+
+    private static void SetCursorLock(bool isLocked)
+    {
+        Cursor.lockState = isLocked ? CursorLockMode.Confined : CursorLockMode.None;
+        Cursor.visible = !isLocked;
+    }
 }

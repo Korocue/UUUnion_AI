@@ -118,6 +118,7 @@ public sealed class InspPopPresenter : MonoBehaviour
         GameDebug.Set("Limit", $"{_gamanCore.LimitSpeed:F4}");
         GameDebug.Set("GamanA", $"{_gamanCore.LoadRatioA:F3}");
         GameDebug.Set("Gaman", $"{_gamanCore.GamanValue:F3}");
+        GameDebug.Set("GamanB", $"{_gamanCore.MixResistanceB:F3}");
         GameDebug.Set("MixCharge", $"{_mixPopCore.Charge:F6}");
         GameDebug.Set("MixPump", $"{_mixPopCore.PumpLevel:F6}");
         GameDebug.Set("MixRadius", $"{_mixPopCore.DragScale:F6}");
