@@ -11,8 +11,10 @@ public sealed class MixPopView : MonoBehaviour
     [SerializeField] private Image mixImage;
 
     [Header("Tuning")]
-    [SerializeField] private float baseScale = 0.0f;       // Mix=0 のときのスケール（面積ベース）。
-    [SerializeField] private float scalePerMix = 0.4f;     // sqrt(Mix) をスケールに変換する係数。
+    [SerializeField] private float baseScale = 0.0f;       // Mix=0 のときのスケール（sqrt(面積)）。
+    [InspectorName("Mix Area Sqrt")]
+    [Tooltip("Mix面積の係数の平方根。最終スケールは sqrt( base^2 + areaRatio*coeff^2 ) で算出。")]
+    [SerializeField] private float scalePerMix = 0.4f;
     [SerializeField] private float mixStrengthPer100 = 0.01f; // 100% を表す Mix 強度。
     [SerializeField] private float maxAreaScale = 1.5f;    // 面積上限（150%）。
 
@@ -42,7 +44,9 @@ public sealed class MixPopView : MonoBehaviour
         var targetArea = 1.0f - (float)pumpLevel;
         var safeCharge = Mathf.Clamp((float)charge, 0f, maxAreaScale);
         var areaRatio = Mathf.Clamp(Mathf.Min(safeCharge, targetArea), 0f, maxAreaScale);
-        var scale = Mathf.Max(0.0f, baseScale + Mathf.Sqrt(areaRatio) * scalePerMix);
+        var baseArea = baseScale * baseScale;
+        var area = baseArea + areaRatio * scalePerMix * scalePerMix;
+        var scale = Mathf.Sqrt(Mathf.Max(0.0f, area));
         mixPop.localScale = Vector3.one * scale;
 
         var denom = Mathf.Max(0.0001f, mixStrengthPer100);

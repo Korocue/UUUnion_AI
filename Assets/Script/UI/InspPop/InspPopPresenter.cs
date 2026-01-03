@@ -7,6 +7,7 @@ public sealed class InspPopPresenter : MonoBehaviour
     [Header("Bindings")]
     [SerializeField] private InspPopView view;
     [SerializeField] private GamanPopView gamanView;
+    [SerializeField] private MixResistPopView mixResistView;
     [SerializeField] private InspPopInput input;
     [SerializeField] private MixPopView mixView;
     [SerializeField] private MixPopInput mixInput;
@@ -15,6 +16,10 @@ public sealed class InspPopPresenter : MonoBehaviour
     [SerializeField] private float mixPerClick = 0.01f; // 1回のポンプ強度（1% = 0.01）。
     [SerializeField] private float dragPixelsPerHalfRadius = 100f; // 100pxで半径が50%になる基準距離。
     [SerializeField] private float maxAreaScale = 1.5f; // 100%以上の面積上限。
+    [SerializeField] private bool enableGamanRate = true;
+    [SerializeField] private bool enableInspModifier = true;
+    [SerializeField] private bool enableGamanA = false;
+    [SerializeField] private GamanCore.InspModifierMode inspModifier = GamanCore.InspModifierMode.Off;
 
     private readonly InspCore _core = new InspCore();
     private readonly MixRateTracker _mixRateTracker = new MixRateTracker();
@@ -88,6 +93,10 @@ public sealed class InspPopPresenter : MonoBehaviour
         _mixAddedThisFrame = 0.0;
 
         var mixAvgSpeed = _mixRateTracker.Tick(mixAdded, dt);
+        _gamanCore.EnableGamanRate = enableGamanRate;
+        _gamanCore.EnableInspModifier = enableInspModifier;
+        _gamanCore.EnableGamanA = enableGamanA;
+        _gamanCore.ModifierMode = inspModifier;
         _gamanCore.Tick(_core.Insp, mixAvgSpeed, mixPerClick, dt);
         if (_gamanCore.GamanValue > 3.0)
         {
@@ -105,6 +114,11 @@ public sealed class InspPopPresenter : MonoBehaviour
             gamanView.ApplyGaman(_gamanCore.GamanValue);
         }
 
+        if (mixResistView != null)
+        {
+            mixResistView.ApplyMixResist(_core.Insp, _gamanCore.GamanValue, _gamanCore.MixResistanceB);
+        }
+
         // デバッグ値（GameDebugOverlay が描画）。
         RegisterDebugValues(mixAvgSpeed);
     }
@@ -118,7 +132,15 @@ public sealed class InspPopPresenter : MonoBehaviour
         GameDebug.Set("Limit", $"{_gamanCore.LimitSpeed:F4}");
         GameDebug.Set("GamanA", $"{_gamanCore.LoadRatioA:F3}");
         GameDebug.Set("Gaman", $"{_gamanCore.GamanValue:F3}");
+        GameDebug.Set("GamanBBase", $"{_gamanCore.MixResistanceBase:F3}");
+        GameDebug.Set("GamanBAdd", $"{_gamanCore.MixResistanceAdd:F3}");
         GameDebug.Set("GamanB", $"{_gamanCore.MixResistanceB:F3}");
+        GameDebug.Set("InspRate", $"{_gamanCore.InspRate:F3}");
+        GameDebug.Set("GamanModRate", $"{_gamanCore.MixResistanceRate:F3}");
+        GameDebug.Set("GamanModMode", $"{_gamanCore.ModifierMode}");
+        GameDebug.Set("GamanModeG", $"{_gamanCore.EnableGamanRate}");
+        GameDebug.Set("GamanModeI", $"{_gamanCore.EnableInspModifier}");
+        GameDebug.Set("GamanModeA", $"{_gamanCore.EnableGamanA}");
         GameDebug.Set("MixCharge", $"{_mixPopCore.Charge:F6}");
         GameDebug.Set("MixPump", $"{_mixPopCore.PumpLevel:F6}");
         GameDebug.Set("MixRadius", $"{_mixPopCore.DragScale:F6}");

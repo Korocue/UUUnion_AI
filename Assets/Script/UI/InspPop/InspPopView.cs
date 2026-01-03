@@ -11,13 +11,17 @@ public sealed class InspPopView : MonoBehaviour
     [SerializeField] private Image inspImage;
 
     [Header("Tuning")]
-    [SerializeField] private float baseScale = 0.0f;    // Insp=0 のときのスケール（面積ベース）。
-    [SerializeField] private float scalePerInsp = 0.5f; // sqrt(Insp) をスケールに変換する係数。
+    [SerializeField] private float baseScale = 0.0f;    // Insp=0 のときのスケール（sqrt(面積)）。
+    [InspectorName("Insp Area Sqrt")]
+    [Tooltip("Insp面積の係数の平方根。最終スケールは sqrt( base^2 + inspRatio*coeff^2 + ... ) で計算。")]
+    [SerializeField] private float scalePerInsp = 0.5f;
     [SerializeField] private float inspPer100 = 1.0f;   // 100% を表す Insp 値。
 
     [Header("Gaman Overlay")]
     [SerializeField] private float gamanPer100 = 1.0f;  // 100% を表す Gaman 値。
-    [SerializeField] private float scalePerGaman = 0.5f;// sqrt(Gaman) をスケールに変換する係数。
+    [InspectorName("Gaman Area Sqrt")]
+    [Tooltip("Gaman面積の係数の平方根。最終スケールは面積合算後に sqrt で算出。")]
+    [SerializeField] private float scalePerGaman = 0.5f;
 
     [Header("Color Band")]
     [SerializeField] private Color color0 = new Color(0f, 1f, 0f); // 0%（緑）
@@ -46,14 +50,18 @@ public sealed class InspPopView : MonoBehaviour
         }
 
         var safeInsp = Mathf.Max(0.0f, (float)insp);
-        var inspScale = Mathf.Sqrt(safeInsp) * scalePerInsp;
+        var inspDenom = Mathf.Max(0.0001f, inspPer100);
+        var inspRatio = Mathf.Max(0.0f, safeInsp / inspDenom);
+        var inspArea = inspRatio * scalePerInsp * scalePerInsp;
 
         var safeGaman = Mathf.Max(0.0f, (float)gamanValue);
         var gamanDenom = Mathf.Max(0.0001f, gamanPer100);
-        var gamanRatio = Mathf.Min(safeGaman / gamanDenom, 1.0f);
-        var gamanScale = Mathf.Sqrt(gamanRatio) * scalePerGaman;
+        var gamanRatio = Mathf.Max(0.0f, safeGaman / gamanDenom);
+        var gamanArea = gamanRatio * scalePerGaman * scalePerGaman;
 
-        var scale = Mathf.Max(0.0f, baseScale + inspScale + gamanScale);
+        var baseArea = baseScale * baseScale;
+        var totalArea = Mathf.Max(0.0f, baseArea + inspArea + gamanArea);
+        var scale = Mathf.Sqrt(totalArea);
         inspPop.localScale = Vector3.one * scale;
 
         ApplyColor(safeInsp);

@@ -78,6 +78,7 @@
     <Compile Include="Assets\Script\UI\InspPop\InspPopInput.cs" />
     <Compile Include="Assets\Script\Core\MixPopCore.cs" />
     <Compile Include="Assets\Script\Core\Camera\CameraController.cs" />
+    <Compile Include="Assets\Script\UI\MixResistPop\MixResistPopView.cs" />
     <Compile Include="Assets\Script\Core\InspCore.cs" />
   </ItemGroup>
   <ItemGroup>

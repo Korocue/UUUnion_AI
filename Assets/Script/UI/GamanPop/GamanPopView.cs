@@ -11,8 +11,10 @@ public sealed class GamanPopView : MonoBehaviour
     [SerializeField] private Image gamanImage;
 
     [Header("Tuning")]
-    [SerializeField] private float baseScale = 0.0f;     // Gaman=0 のときのスケール（面積ベース）。
-    [SerializeField] private float scalePerGaman = 0.5f; // sqrt(Gaman) をスケールに変換する係数。
+    [SerializeField] private float baseScale = 0.0f;     // Gaman=0 のときのスケール（sqrt(面積)）。
+    [InspectorName("Gaman Area Sqrt")]
+    [Tooltip("Gaman面積の係数の平方根。最終スケールは sqrt( base^2 + ratio*coeff^2 ) で算出。")]
+    [SerializeField] private float scalePerGaman = 0.5f;
     [SerializeField] private float gamanPer100 = 1.0f;   // 100% を表す Gaman 値。
 
     [Header("Color Band")]
@@ -44,7 +46,9 @@ public sealed class GamanPopView : MonoBehaviour
 
         var denom = Mathf.Max(0.0001f, gamanPer100);
         var ratio100 = Mathf.Max(0.0f, (float)gamanValue / denom);
-        var scale = Mathf.Max(0.0f, baseScale + Mathf.Sqrt(ratio100) * scalePerGaman);
+        var baseArea = baseScale * baseScale;
+        var area = baseArea + ratio100 * scalePerGaman * scalePerGaman;
+        var scale = Mathf.Sqrt(Mathf.Max(0.0f, area));
         gamanPop.localScale = Vector3.one * scale;
 
         ApplyColor(ratio100);
