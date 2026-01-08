@@ -57,4 +57,11 @@ public sealed class InspCore
         _insp = 0.0;
         return amount;
     }
+
+    // Insp/Mix を初期化する。
+    public void Reset()
+    {
+        _insp = 0.0;
+        _mix = 0.0;
+    }
 }

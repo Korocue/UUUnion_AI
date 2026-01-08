@@ -54,9 +54,8 @@ public sealed class InspPopView : MonoBehaviour
         var inspRatio = Mathf.Max(0.0f, safeInsp / inspDenom);
         var inspArea = inspRatio * scalePerInsp * scalePerInsp;
 
-        var safeGaman = Mathf.Max(0.0f, (float)gamanValue);
         var gamanDenom = Mathf.Max(0.0001f, gamanPer100);
-        var gamanRatio = Mathf.Max(0.0f, safeGaman / gamanDenom);
+        var gamanRatio = (float)gamanValue / gamanDenom;
         var gamanArea = gamanRatio * scalePerGaman * scalePerGaman;
 
         var baseArea = baseScale * baseScale;

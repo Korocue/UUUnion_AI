@@ -22,6 +22,14 @@ public sealed class GamanCore
     private double _mixResistanceBase;
     private double _mixResistanceAdd;
     private double _mixResistanceRate;
+    private double _gamanValue;
+    private double _dokiEmaValue;
+
+    public enum GamanMode
+    {
+        ZiwaZiwa,
+        DokiDoki
+    }
 
     public enum InspModifierMode
     {
@@ -43,8 +51,10 @@ public sealed class GamanCore
     public double MixResistanceBase => _mixResistanceBase;
     public double MixResistanceAdd => _mixResistanceAdd;
     public double MixResistanceRate => _mixResistanceRate;
-    public double GamanValue => _ema.Value;
+    public double GamanValue => _gamanValue;
     public double InspRate => _inspRate;
+    public double DokiEmaValue => _dokiEmaValue;
+    public GamanMode Mode { get; set; } = GamanMode.ZiwaZiwa;
     public InspModifierMode ModifierMode { get; set; } = InspModifierMode.Off;
     public bool EnableGamanRate { get; set; } = true;
     public bool EnableInspModifier { get; set; } = true;
@@ -65,6 +75,8 @@ public sealed class GamanCore
             _mixResistanceAdd = 0.0;
             _mixResistanceRate = 0.0;
             _inspRate = 0.0;
+            _gamanValue = 0.0;
+            _dokiEmaValue = 0.0;
             if (dt > 0.0)
             {
                 _ema.SetHalfLife(DefaultHalfLifeSeconds);
@@ -93,7 +105,22 @@ public sealed class GamanCore
             _ema.Step(_loadRatioA / 60.0, dt);
         }
 
-        _mixResistanceBase = ResolveBaseResistance(_ema.Value, _loadRatioA);
+        if (Mode == GamanMode.DokiDoki)
+        {
+            if (dt > 0.0)
+            {
+                var k = Math.Log(2.0) / 1.0;
+                var decay = Math.Exp(-k * dt);
+                _dokiEmaValue = _dokiEmaValue * decay + _loadRatioA * (1.0 - decay);
+            }
+
+            _gamanValue = _loadRatioA - _dokiEmaValue;
+        }
+        else
+        {
+            _gamanValue = _ema.Value;
+        }
+        _mixResistanceBase = ResolveBaseResistance(_gamanValue, _loadRatioA);
         _mixResistanceB = ApplyModeModifier(_mixResistanceBase, _inspRate);
 
         if (dt > 0.0)
@@ -193,9 +220,7 @@ public sealed class GamanCore
                 return Clamp(r, 0.0, 1.0);
             case InspModifierMode.Saturation:
             {
-                var k = Math.Log(3.0) / Math.Log(2.0);
-                var rk = Math.Pow(r, k);
-                return rk <= 0.0 ? 0.0 : Clamp(rk / (1.0 + rk), 0.0, 1.0);
+                return Clamp(UUSat.Evaluate(r), 0.0, 1.0);
             }
             default:
                 return 0.0;
@@ -215,5 +240,20 @@ public sealed class GamanCore
         }
 
         return value;
+    }
+
+    public void Reset()
+    {
+        _limitSpeed = 0.0;
+        _loadRatioA = 0.0;
+        _mixResistanceB = GetResistanceMax();
+        _mixResistanceBase = GetResistanceMax();
+        _mixResistanceAdd = 0.0;
+        _mixResistanceRate = 0.0;
+        _inspRate = 0.0;
+        _gamanValue = 0.0;
+        _dokiEmaValue = 0.0;
+        _ema.SetHalfLife(DefaultHalfLifeSeconds);
+        _ema.Reset(0.0);
     }
 }

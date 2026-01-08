@@ -16,6 +16,7 @@ public sealed class InspPopPresenter : MonoBehaviour
     [SerializeField] private float mixPerClick = 0.01f; // 1回のポンプ強度（1% = 0.01）。
     [SerializeField] private float dragPixelsPerHalfRadius = 100f; // 100pxで半径が50%になる基準距離。
     [SerializeField] private float maxAreaScale = 1.5f; // 100%以上の面積上限。
+    [SerializeField] private GamanCore.GamanMode gamanMode = GamanCore.GamanMode.ZiwaZiwa;
     [SerializeField] private bool enableGamanRate = true;
     [SerializeField] private bool enableInspModifier = true;
     [SerializeField] private bool enableGamanA = false;
@@ -53,6 +54,11 @@ public sealed class InspPopPresenter : MonoBehaviour
         if (input == null && mixInput == null && Input.GetMouseButtonDown(1))
         {
             OnRightClicked();
+        }
+
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            ResetState();
         }
 
         var dt = Time.deltaTime;
@@ -93,6 +99,7 @@ public sealed class InspPopPresenter : MonoBehaviour
         _mixAddedThisFrame = 0.0;
 
         var mixAvgSpeed = _mixRateTracker.Tick(mixAdded, dt);
+        _gamanCore.Mode = gamanMode;
         _gamanCore.EnableGamanRate = enableGamanRate;
         _gamanCore.EnableInspModifier = enableInspModifier;
         _gamanCore.EnableGamanA = enableGamanA;
@@ -141,6 +148,8 @@ public sealed class InspPopPresenter : MonoBehaviour
         GameDebug.Set("GamanModeG", $"{_gamanCore.EnableGamanRate}");
         GameDebug.Set("GamanModeI", $"{_gamanCore.EnableInspModifier}");
         GameDebug.Set("GamanModeA", $"{_gamanCore.EnableGamanA}");
+        GameDebug.Set("GamanMode", $"{_gamanCore.Mode}");
+        GameDebug.Set("GamanDokiEma", $"{_gamanCore.DokiEmaValue:F3}");
         GameDebug.Set("MixCharge", $"{_mixPopCore.Charge:F6}");
         GameDebug.Set("MixPump", $"{_mixPopCore.PumpLevel:F6}");
         GameDebug.Set("MixRadius", $"{_mixPopCore.DragScale:F6}");
@@ -162,5 +171,37 @@ public sealed class InspPopPresenter : MonoBehaviour
         // 右クリックで Mix が増える（仕様: InspCore.md）。
         _core.AddMix(mixPerClick);
         _mixAddedThisFrame += mixPerClick;
+    }
+
+    private void ResetState()
+    {
+        _core.Reset();
+        _gamanCore.Reset();
+        _mixRateTracker.Reset();
+        _mixPopCore.Reset();
+        _movedSinceLastLog = 0.0;
+        _mixAddedThisFrame = 0.0;
+        _production = 0.0;
+        _logTimer = 0f;
+
+        if (view != null)
+        {
+            view.ApplyInsp(0.0, 0.0);
+        }
+
+        if (gamanView != null)
+        {
+            gamanView.ApplyGaman(0.0);
+        }
+
+        if (mixView != null)
+        {
+            mixView.ApplyMix(_mixPopCore.Charge, _mixPopCore.PumpLevel, mixPerClick);
+        }
+
+        if (mixResistView != null)
+        {
+            mixResistView.ApplyMixResist(0.0, 0.0, _gamanCore.MixResistanceB);
+        }
     }
 }

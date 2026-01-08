@@ -70,6 +70,7 @@
     <Compile Include="Assets\Script\Core\Camera\CameraDefaultAreaOverlay.cs" />
     <Compile Include="Assets\Script\Core\GamanCore.cs" />
     <Compile Include="Assets\Script\UI\MixPop\MixPopView.cs" />
+    <Compile Include="Assets\Script\Core\UUSat.cs" />
     <Compile Include="Assets\Script\Core\EmaHalfLife.cs" />
     <Compile Include="Assets\Script\UI\InspPop\InspPopView.cs" />
     <Compile Include="Assets\Script\Core\Debug\GameDebugOverlay.cs" />
