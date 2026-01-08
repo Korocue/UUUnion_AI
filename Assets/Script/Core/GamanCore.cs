@@ -109,9 +109,13 @@ public sealed class GamanCore
         {
             if (dt > 0.0)
             {
-                var k = Math.Log(2.0) / 1.0;
+                var sat = UUSat.Evaluate(_inspRate);
+                var denom = Math.Max(1e-6, 1.0 - sat);
+                var halfLife = 1.0 / denom;
+                var k = Math.Log(2.0) / halfLife;
                 var decay = Math.Exp(-k * dt);
-                _dokiEmaValue = _dokiEmaValue * decay + _loadRatioA * (1.0 - decay);
+                var input = _loadRatioA / halfLife;
+                _dokiEmaValue = _dokiEmaValue * decay + input * (1.0 - decay);
             }
 
             _gamanValue = _loadRatioA - _dokiEmaValue;
